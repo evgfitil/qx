@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/erakhmetzyan/qx/internal/config"
 	"github.com/erakhmetzyan/qx/internal/llm"
-	"github.com/spf13/cobra"
+	"github.com/erakhmetzyan/qx/internal/picker"
 )
 
 var (
@@ -95,11 +97,20 @@ func generateCommands(query string) error {
 		return fmt.Errorf("failed to generate commands: %w", err)
 	}
 
-	// TODO: Step 3 - Show picker for command selection
-	// For now, just print all commands
-	fmt.Println("Generated commands:")
-	for i, cmd := range commands {
-		fmt.Printf("%d. %s\n", i+1, cmd)
+	if len(commands) == 0 {
+		return fmt.Errorf("no commands generated")
+	}
+
+	selected, err := picker.Pick(commands)
+	if err != nil {
+		if errors.Is(err, picker.ErrAborted) {
+			return nil
+		}
+		return fmt.Errorf("failed to pick command: %w", err)
+	}
+
+	if selected != "" {
+		fmt.Println(selected)
 	}
 
 	return nil
