@@ -11,6 +11,7 @@ about.md
 
 # Binaries
 qx
+dist/
 *.exe
 *.exe~
 *.dll
