@@ -6,6 +6,9 @@ about.md
 # Claude Code
 .claude/
 
+# IDE
+.idea/
+
 # Binaries
 qx
 *.exe
