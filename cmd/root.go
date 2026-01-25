@@ -1,0 +1,125 @@
+package cmd
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/spf13/cobra"
+
+	"github.com/erakhmetzyan/qx/internal/config"
+	"github.com/erakhmetzyan/qx/internal/llm"
+	"github.com/erakhmetzyan/qx/internal/picker"
+	"github.com/erakhmetzyan/qx/internal/shell"
+	"github.com/erakhmetzyan/qx/internal/tui"
+)
+
+var (
+	Version          = "dev"
+	shellIntegration string
+	showConfig       bool
+)
+
+var rootCmd = &cobra.Command{
+	Use:   "qx [query]",
+	Short: "Generate shell commands using LLM",
+	Long: `qx is a CLI tool that generates shell commands from natural language descriptions.
+It uses LLM to generate multiple command variants and presents them in a fzf-style picker.`,
+	Version: Version,
+	Args:    cobra.MaximumNArgs(1),
+	RunE:    run,
+}
+
+func init() {
+	rootCmd.Flags().StringVar(&shellIntegration, "shell-integration", "", "output shell integration script (bash|zsh)")
+	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
+}
+
+// Execute runs the root command
+func Execute() error {
+	return rootCmd.Execute()
+}
+
+func run(cmd *cobra.Command, args []string) error {
+	if showConfig {
+		fmt.Println(config.Path())
+		return nil
+	}
+
+	if shellIntegration != "" {
+		return handleShellIntegration(shellIntegration)
+	}
+
+	if len(args) == 0 {
+		return runInteractive()
+	}
+
+	query := args[0]
+	return generateCommands(query)
+}
+
+func runInteractive() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	selected, err := tui.Run(cfg.LLM.ToLLMConfig())
+	if err != nil {
+		return fmt.Errorf("TUI error: %w", err)
+	}
+
+	if selected != "" {
+		fmt.Println(selected)
+	}
+
+	return nil
+}
+
+func handleShellIntegration(shellName string) error {
+	script, err := shell.Script(shellName)
+	if err != nil {
+		return err
+	}
+	fmt.Print(script)
+	return nil
+}
+
+// generateCommands generates shell commands using LLM based on user query.
+func generateCommands(query string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	provider, err := llm.NewProvider(cfg.LLM.ToLLMConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create LLM provider: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
+	defer cancel()
+
+	commands, err := provider.Generate(ctx, query, cfg.LLM.Count)
+	if err != nil {
+		return fmt.Errorf("failed to generate commands: %w", err)
+	}
+
+	if len(commands) == 0 {
+		return fmt.Errorf("no commands generated")
+	}
+
+	selected, err := picker.Pick(commands)
+	if err != nil {
+		if errors.Is(err, picker.ErrAborted) {
+			return nil
+		}
+		return fmt.Errorf("failed to pick command: %w", err)
+	}
+
+	if selected != "" {
+		fmt.Println(selected)
+	}
+
+	return nil
+}
