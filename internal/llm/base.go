@@ -2,7 +2,9 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sashabaranov/go-openai"
@@ -19,6 +21,28 @@ const (
 type baseProvider struct {
 	client *openai.Client
 	model  string
+}
+
+// categorizeAPIError returns a user-friendly error message based on the API error type
+func categorizeAPIError(err error) error {
+	var apiErr *openai.APIError
+	if errors.As(err, &apiErr) {
+		switch apiErr.HTTPStatusCode {
+		case 401:
+			return fmt.Errorf("authentication failed: check OPENAI_API_KEY")
+		case 429:
+			return fmt.Errorf("rate limit exceeded")
+		case 500, 502, 503:
+			return fmt.Errorf("API server error: try again later")
+		}
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("request timed out")
+	}
+	if errors.Is(err, context.Canceled) {
+		return fmt.Errorf("request canceled")
+	}
+	return err
 }
 
 // Generate creates shell commands based on user query
@@ -53,7 +77,7 @@ func (p *baseProvider) Generate(ctx context.Context, query string, count int) ([
 
 	resp, err := p.client.CreateChatCompletion(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("LLM API request failed: %w", err)
+		return nil, categorizeAPIError(err)
 	}
 
 	if len(resp.Choices) == 0 {
@@ -61,6 +85,10 @@ func (p *baseProvider) Generate(ctx context.Context, query string, count int) ([
 	}
 
 	content := resp.Choices[0].Message.Content
+	if strings.TrimSpace(content) == "" {
+		return nil, fmt.Errorf("LLM returned empty response")
+	}
+
 	commands, err := ParseCommands([]byte(content))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse LLM output: %w", err)

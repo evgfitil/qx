@@ -80,10 +80,10 @@ func Load() (*Config, error) {
 	}
 
 	if cfg.LLM.Model == "" {
-		return nil, fmt.Errorf("llm.model is required")
+		return nil, fmt.Errorf("llm.model is required in %s", path)
 	}
 	if cfg.LLM.Count < 1 {
-		return nil, fmt.Errorf("llm.count must be at least 1, got %d", cfg.LLM.Count)
+		return nil, fmt.Errorf("llm.count must be at least 1, got %d (in %s)", cfg.LLM.Count, path)
 	}
 
 	cfg.LLM.APIKey = os.Getenv("OPENAI_API_KEY")
