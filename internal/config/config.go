@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/viper"
+
+	"github.com/erakhmetzyan/qx/internal/llm"
 )
 
 const (
@@ -14,6 +17,7 @@ const (
 	DefaultBaseURL = "https://api.openai.com/v1"
 	DefaultModel   = "gpt-4o-mini"
 	DefaultCount   = 5
+	DefaultTimeout = 60 * time.Second
 )
 
 // Config represents the application configuration
@@ -23,11 +27,22 @@ type Config struct {
 
 // LLMConfig contains LLM-related configuration
 type LLMConfig struct {
-	BaseURL  string `mapstructure:"base_url"` // default: https://api.openai.com/v1
-	Model    string `mapstructure:"model"`    // default: gpt-4o-mini
-	Count    int    `mapstructure:"count"`    // default: 5 (number of command variants)
-	Provider string `mapstructure:"provider"` // optional: "openai" or "eliza" (auto-detected if not set)
-	APIKey   string `mapstructure:"-"`        // from environment variable only
+	BaseURL  string `mapstructure:"base_url"`
+	Model    string `mapstructure:"model"`
+	Count    int    `mapstructure:"count"`
+	Provider string `mapstructure:"provider"`
+	APIKey   string `mapstructure:"-"`
+}
+
+// ToLLMConfig converts LLMConfig to llm.Config for provider creation
+func (c LLMConfig) ToLLMConfig() llm.Config {
+	return llm.Config{
+		BaseURL:  c.BaseURL,
+		APIKey:   c.APIKey,
+		Model:    c.Model,
+		Provider: c.Provider,
+		Count:    c.Count,
+	}
 }
 
 // configPath returns the full path to the config file
