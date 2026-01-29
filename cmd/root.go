@@ -7,11 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/erakhmetzyan/qx/internal/config"
-	"github.com/erakhmetzyan/qx/internal/llm"
-	"github.com/erakhmetzyan/qx/internal/picker"
-	"github.com/erakhmetzyan/qx/internal/shell"
-	"github.com/erakhmetzyan/qx/internal/tui"
+	"github.com/evgfitil/qx/internal/config"
+	"github.com/evgfitil/qx/internal/llm"
+	"github.com/evgfitil/qx/internal/picker"
+	"github.com/evgfitil/qx/internal/shell"
+	"github.com/evgfitil/qx/internal/tui"
 )
 
 var (

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/erakhmetzyan/qx/cmd"
+	"github.com/evgfitil/qx/cmd"
 )
 
 func main() {

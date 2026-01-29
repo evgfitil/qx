@@ -5,7 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/erakhmetzyan/qx/internal/llm"
+	"github.com/evgfitil/qx/internal/llm"
 )
 
 // Run starts the interactive TUI and returns the selected command.

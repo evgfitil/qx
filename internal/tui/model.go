@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/erakhmetzyan/qx/internal/config"
-	"github.com/erakhmetzyan/qx/internal/llm"
+	"github.com/evgfitil/qx/internal/config"
+	"github.com/evgfitil/qx/internal/llm"
 )
 
 type state int
