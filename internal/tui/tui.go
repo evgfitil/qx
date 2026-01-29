@@ -10,8 +10,9 @@ import (
 
 // Run starts the interactive TUI and returns the selected command.
 // Returns empty string if user cancelled (Esc/Ctrl+C).
-func Run(cfg llm.Config) (string, error) {
-	m := NewModel(cfg)
+// initialQuery is optional and pre-fills the input field.
+func Run(cfg llm.Config, initialQuery string) (string, error) {
+	m := NewModel(cfg, initialQuery)
 
 	// Open /dev/tty for TUI output so it works even when stdout is redirected
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)

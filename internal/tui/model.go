@@ -52,8 +52,8 @@ type Model struct {
 	quitting  bool
 }
 
-// NewModel creates a new TUI model
-func NewModel(cfg llm.Config) Model {
+// NewModel creates a new TUI model with optional initial query
+func NewModel(cfg llm.Config, initialQuery string) Model {
 	ti := textinput.New()
 	ti.Placeholder = "describe the command you need..."
 	ti.Focus()
@@ -62,6 +62,11 @@ func NewModel(cfg llm.Config) Model {
 	ti.Prompt = "> "
 	ti.PromptStyle = promptStyle()
 	ti.Cursor.Style = cursorStyle()
+
+	if initialQuery != "" {
+		ti.SetValue(initialQuery)
+		ti.CursorEnd()
+	}
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
