@@ -1,4 +1,4 @@
-module github.com/erakhmetzyan/qx
+module github.com/evgfitil/qx
 
 go 1.24.0
 

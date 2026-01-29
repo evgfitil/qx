@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/erakhmetzyan/qx/internal/llm"
+	"github.com/evgfitil/qx/internal/llm"
 )
 
 const (
