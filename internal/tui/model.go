@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/erakhmetzyan/qx/internal/config"
 	"github.com/erakhmetzyan/qx/internal/llm"
@@ -189,6 +190,23 @@ func (m Model) updateFilter() Model {
 	return m
 }
 
+func truncateWithEllipsis(s string, maxWidth int) string {
+	if maxWidth <= 3 {
+		return s
+	}
+	if len(s) <= maxWidth {
+		return s
+	}
+	return s[:maxWidth-3] + "..."
+}
+
+func wrapCommand(s string, width int) string {
+	if width <= 0 {
+		return s
+	}
+	return lipgloss.NewStyle().Width(width).Render(s)
+}
+
 // View implements tea.Model
 func (m Model) View() string {
 	if m.quitting && m.selected == "" {
@@ -223,9 +241,11 @@ func (m Model) View() string {
 		for i := start; i < end; i++ {
 			cmd := m.filtered[i]
 			if i == m.cursor {
-				b.WriteString(selectedStyle().Render("> " + cmd))
+				wrapped := wrapCommand("> "+cmd, m.width)
+				b.WriteString(selectedStyle().Render(wrapped))
 			} else {
-				b.WriteString(normalStyle().Render("  " + cmd))
+				truncated := truncateWithEllipsis("  "+cmd, m.width)
+				b.WriteString(normalStyle().Render(truncated))
 			}
 			b.WriteString("\n")
 		}
