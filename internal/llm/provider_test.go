@@ -75,4 +75,3 @@ func TestNewProvider(t *testing.T) {
 		})
 	}
 }
-

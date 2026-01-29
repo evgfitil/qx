@@ -41,7 +41,6 @@ type Model struct {
 	spinner   spinner.Model
 	commands  []string
 	cursor    int
-	filter    string
 	filtered  []string
 	selected  string
 	err       error

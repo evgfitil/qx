@@ -17,10 +17,9 @@ func Run(cfg llm.Config, initialQuery string) (string, error) {
 	// Open /dev/tty for TUI output so it works even when stdout is redirected
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
 	if err != nil {
-		// Fallback to stdout if /dev/tty is not available
 		tty = os.Stdout
 	} else {
-		defer tty.Close()
+		defer tty.Close() //nolint:errcheck
 	}
 
 	p := tea.NewProgram(m, tea.WithOutput(tty))
