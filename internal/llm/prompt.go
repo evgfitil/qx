@@ -47,7 +47,7 @@ func ParseCommands(jsonResponse []byte) ([]string, error) {
 	validCommands := make([]string, 0, len(response.Commands))
 	for _, cmd := range response.Commands {
 		if cmd != "" {
-			validCommands = append(validCommands, cmd)
+			validCommands = append(validCommands, FormatCommand(cmd))
 		}
 	}
 
