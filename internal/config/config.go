@@ -31,7 +31,7 @@ type LLMConfig struct {
 	Model    string `mapstructure:"model"`
 	Count    int    `mapstructure:"count"`
 	Provider string `mapstructure:"provider"`
-	APIKey   string `mapstructure:"-"`
+	APIKey   string `mapstructure:"apikey"`
 }
 
 // ToLLMConfig converts LLMConfig to llm.Config for provider creation
@@ -60,6 +60,8 @@ func Load() (*Config, error) {
 	viper.SetDefault("llm.model", DefaultModel)
 	viper.SetDefault("llm.count", DefaultCount)
 
+	viper.MustBindEnv("llm.apikey", "OPENAI_API_KEY")
+
 	path, err := configPath()
 	if err != nil {
 		return nil, err
@@ -86,9 +88,8 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("llm.count must be at least 1, got %d (in %s)", cfg.LLM.Count, path)
 	}
 
-	cfg.LLM.APIKey = os.Getenv("OPENAI_API_KEY")
 	if cfg.LLM.APIKey == "" {
-		return nil, fmt.Errorf("OPENAI_API_KEY environment variable is required")
+		return nil, fmt.Errorf("OPENAI_API_KEY environment variable or llm.apikey in %s are required", path)
 	}
 
 	return &cfg, nil
