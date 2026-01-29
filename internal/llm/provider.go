@@ -18,8 +18,5 @@ type Provider interface {
 
 // NewProvider creates appropriate provider based on configuration
 func NewProvider(cfg Config) (Provider, error) {
-	if cfg.Provider == "eliza" {
-		return newElizaProvider(cfg)
-	}
 	return newOpenAIProvider(cfg)
 }
