@@ -9,7 +9,7 @@ Generate shell commands from natural language using LLM.
 - Natural language to shell command conversion
 - Multiple command variants with fuzzy selection
 - Interactive TUI with real-time filtering
-- Shell integration (Ctrl+G hotkey)
+- Shell integration (Ctrl+G hotkey) with inline editing support
 - Support for OpenAI-compatible APIs
 
 ## Installation
@@ -58,6 +58,9 @@ source ~/.zshrc  # or ~/.bashrc
 # Now press Ctrl+G in terminal to invoke qx
 ```
 
+**Inline editing**: Start typing a command, press Ctrl+G, and qx will use your
+input as initial query. Add instructions to modify or extend the command.
+
 ### Direct mode
 
 ```bash
@@ -69,6 +72,13 @@ qx "find all go files modified today"
 ```bash
 qx
 # Type your query, press Enter, select command
+```
+
+### Pre-filled query
+
+```bash
+qx --query "git log"
+# TUI opens with input field pre-filled
 ```
 
 ## License

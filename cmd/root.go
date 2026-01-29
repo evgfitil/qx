@@ -18,6 +18,7 @@ var (
 	Version          = "dev"
 	shellIntegration string
 	showConfig       bool
+	queryFlag        string
 )
 
 var rootCmd = &cobra.Command{
@@ -33,6 +34,7 @@ It uses LLM to generate multiple command variants and presents them in a fzf-sty
 func init() {
 	rootCmd.Flags().StringVar(&shellIntegration, "shell-integration", "", "output shell integration script (bash|zsh)")
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
+	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
 }
 
 // Execute runs the root command
@@ -51,20 +53,20 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(args) == 0 {
-		return runInteractive()
+		return runInteractive(queryFlag)
 	}
 
 	query := args[0]
 	return generateCommands(query)
 }
 
-func runInteractive() error {
+func runInteractive(initialQuery string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	selected, err := tui.Run(cfg.LLM.ToLLMConfig())
+	selected, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
