@@ -35,7 +35,7 @@ func (t *elizaTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 // unwrapElizaResponse extracts the actual OpenAI-compatible response from Eliza wrapper.
 func unwrapElizaResponse(resp *http.Response) (*http.Response, error) {
 	body, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	_ = resp.Body.Close()
 	if err != nil {
 		return resp, err
 	}

@@ -20,7 +20,7 @@ func Run(cfg llm.Config, initialQuery string) (string, error) {
 		// Fallback to stdout if /dev/tty is not available
 		tty = os.Stdout
 	} else {
-		defer tty.Close()
+		defer func() { _ = tty.Close() }()
 	}
 
 	p := tea.NewProgram(m, tea.WithOutput(tty))

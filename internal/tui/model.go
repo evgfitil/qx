@@ -39,10 +39,9 @@ type Model struct {
 	state     state
 	textInput textinput.Model
 	spinner   spinner.Model
-	commands  []string
-	cursor    int
-	filter    string
-	filtered  []string
+	commands []string
+	cursor   int
+	filtered []string
 	selected  string
 	err       error
 	llmConfig llm.Config
