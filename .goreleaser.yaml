@@ -63,3 +63,11 @@ brews:
       bin.install "qx"
     test: |
       system "#{bin}/qx", "--help"
+    caveats: |
+      To enable shell integration (Ctrl+G hotkey), add to your shell config:
+
+        # zsh (~/.zshrc)
+        source <(qx --shell-integration zsh)
+
+        # bash (~/.bashrc)
+        eval "$(qx --shell-integration bash)"
