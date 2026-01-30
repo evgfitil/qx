@@ -17,7 +17,7 @@ Generate shell commands from natural language using LLM.
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew tap evgfitil/qx
+brew tap evgfitil/tap
 brew install qx
 ```
 
