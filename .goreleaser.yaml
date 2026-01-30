@@ -48,3 +48,18 @@ release:
     name: qx
   draft: false
   prerelease: auto
+
+brews:
+  - name: qx
+    repository:
+      owner: evgfitil
+      name: qx
+      branch: main
+    directory: Formula
+    homepage: https://github.com/evgfitil/qx
+    description: Generate shell commands from natural language using LLM
+    license: MIT
+    install: |
+      bin.install "qx"
+    test: |
+      system "#{bin}/qx", "--help"
