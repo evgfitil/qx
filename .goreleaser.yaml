@@ -54,6 +54,8 @@ brews:
     repository:
       owner: evgfitil
       name: homebrew-tap
+      branch: main
+    directory: Formula
     homepage: https://github.com/evgfitil/qx
     description: Generate shell commands from natural language using LLM
     license: MIT
