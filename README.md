@@ -14,7 +14,14 @@ Generate shell commands from natural language using LLM.
 
 ## Installation
 
-### From releases (recommended)
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap evgfitil/qx
+brew install qx
+```
+
+### From releases
 
 ```bash
 curl -sSL https://github.com/evgfitil/qx/releases/latest/download/qx_$(uname -s)_$(uname -m).tar.gz | tar xz
@@ -35,13 +42,18 @@ Create `~/.config/qx/config.yaml`:
 llm:
   base_url: "https://api.openai.com/v1"  # or any OpenAI-compatible API
   model: "gpt-4o-mini"
-  count: 5  # how many commands to suggest
+  count: 3  # how many commands to suggest
+  apikey: "your-key-here"  # optional, can use env variable instead
 ```
 
-Set your API key:
+**API Key**: Set via `OPENAI_API_KEY` environment variable or `llm.apikey` in config.
+Environment variable takes precedence if both are set.
 
 ```bash
+# Option 1: environment variable
 export OPENAI_API_KEY="your-key-here"
+
+# Option 2: set apikey in config.yaml (see above)
 ```
 
 ## Usage
