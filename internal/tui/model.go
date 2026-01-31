@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/evgfitil/qx/internal/config"
+	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
 )
 
@@ -157,6 +158,14 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 		if query == "" {
 			return m, nil
 		}
+
+		sanitizer := guard.New()
+		result := sanitizer.Check(query)
+		if result.HasSecrets && !m.llmConfig.ForceSend {
+			m.err = fmt.Errorf("secrets detected: %s", formatDetections(result.Detected))
+			return m, nil
+		}
+
 		m.state = stateLoading
 		return m, tea.Batch(
 			m.spinner.Tick,
@@ -279,4 +288,15 @@ func generateCommands(query string, cfg llm.Config) tea.Cmd {
 		commands, err := provider.Generate(ctx, query, cfg.Count)
 		return commandsMsg{commands: commands, err: err}
 	}
+}
+
+func formatDetections(detected []guard.Detection) string {
+	if len(detected) == 0 {
+		return ""
+	}
+	var descriptions []string
+	for _, d := range detected {
+		descriptions = append(descriptions, d.Description)
+	}
+	return strings.Join(descriptions, ", ")
 }

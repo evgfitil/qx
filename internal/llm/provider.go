@@ -4,11 +4,12 @@ import "context"
 
 // Config contains configuration for LLM provider
 type Config struct {
-	BaseURL  string
-	APIKey   string
-	Model    string
-	Provider string // optional: "eliza" to use Eliza, empty or "openai" for OpenAI-compatible API
-	Count    int    // number of command variants to generate
+	BaseURL   string
+	APIKey    string
+	Model     string
+	Provider  string
+	Count     int  // number of command variants to generate
+	ForceSend bool // send query even if sensitive data detected
 }
 
 // Provider generates shell commands using LLM

@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/evgfitil/qx/internal/config"
+	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
 	"github.com/evgfitil/qx/internal/picker"
 	"github.com/evgfitil/qx/internal/shell"
@@ -19,6 +21,7 @@ var (
 	shellIntegration string
 	showConfig       bool
 	queryFlag        string
+	forceSend        bool
 )
 
 var rootCmd = &cobra.Command{
@@ -35,6 +38,7 @@ func init() {
 	rootCmd.Flags().StringVar(&shellIntegration, "shell-integration", "", "output shell integration script (bash|zsh)")
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
+	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
 }
 
 // Execute runs the root command
@@ -66,6 +70,7 @@ func runInteractive(initialQuery string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	cfg.LLM.ForceSend = forceSend
 	selected, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
@@ -89,6 +94,18 @@ func handleShellIntegration(shellName string) error {
 
 // generateCommands generates shell commands using LLM based on user query.
 func generateCommands(query string) error {
+	sanitizer := guard.New()
+	result := sanitizer.Check(query)
+	if result.HasSecrets && !forceSend {
+		fmt.Fprintln(os.Stderr, "Warning: potential secrets detected:")
+		for _, d := range result.Detected {
+			fmt.Fprintf(os.Stderr, "  - %s\n", d.Description)
+		}
+		fmt.Fprintln(os.Stderr, "\nQuery will NOT be sent to LLM.")
+		fmt.Fprintln(os.Stderr, "Use --force-send to override.")
+		return fmt.Errorf("secrets detected in query")
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
