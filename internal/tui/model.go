@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/evgfitil/qx/internal/config"
+	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
 )
 
@@ -45,6 +46,7 @@ type Model struct {
 	selected  string
 	err       error
 	llmConfig llm.Config
+	forceSend bool
 	width     int
 	height    int
 	maxHeight int
@@ -52,7 +54,7 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model with optional initial query
-func NewModel(cfg llm.Config, initialQuery string) Model {
+func NewModel(cfg llm.Config, initialQuery string, forceSend bool) Model {
 	ti := textinput.New()
 	ti.Placeholder = "describe the command you need..."
 	ti.Focus()
@@ -76,6 +78,7 @@ func NewModel(cfg llm.Config, initialQuery string) Model {
 		textInput: ti,
 		spinner:   s,
 		llmConfig: cfg,
+		forceSend: forceSend,
 		maxHeight: 10,
 	}
 }
@@ -157,6 +160,12 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 		if query == "" {
 			return m, nil
 		}
+
+		if err := guard.CheckQuery(query, m.forceSend); err != nil {
+			m.err = err
+			return m, nil
+		}
+
 		m.state = stateLoading
 		return m, tea.Batch(
 			m.spinner.Tick,
@@ -277,6 +286,14 @@ func generateCommands(query string, cfg llm.Config) tea.Cmd {
 		defer cancel()
 
 		commands, err := provider.Generate(ctx, query, cfg.Count)
-		return commandsMsg{commands: commands, err: err}
+		if err != nil {
+			return commandsMsg{err: err}
+		}
+
+		for i, cmd := range commands {
+			commands[i] = guard.SanitizeOutput(cmd)
+		}
+
+		return commandsMsg{commands: commands}
 	}
 }

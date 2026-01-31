@@ -7,8 +7,8 @@ type Config struct {
 	BaseURL  string
 	APIKey   string
 	Model    string
-	Provider string // optional: "eliza" to use Eliza, empty or "openai" for OpenAI-compatible API
-	Count    int    // number of command variants to generate
+	Provider string
+	Count    int // number of command variants to generate
 }
 
 // Provider generates shell commands using LLM

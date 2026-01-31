@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/evgfitil/qx/internal/config"
+	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
 	"github.com/evgfitil/qx/internal/picker"
 	"github.com/evgfitil/qx/internal/shell"
@@ -19,6 +20,7 @@ var (
 	shellIntegration string
 	showConfig       bool
 	queryFlag        string
+	forceSend        bool
 )
 
 var rootCmd = &cobra.Command{
@@ -35,6 +37,7 @@ func init() {
 	rootCmd.Flags().StringVar(&shellIntegration, "shell-integration", "", "output shell integration script (bash|zsh)")
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
+	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
 }
 
 // Execute runs the root command
@@ -66,7 +69,7 @@ func runInteractive(initialQuery string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	selected, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery)
+	selected, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
@@ -89,6 +92,10 @@ func handleShellIntegration(shellName string) error {
 
 // generateCommands generates shell commands using LLM based on user query.
 func generateCommands(query string) error {
+	if err := guard.CheckQuery(query, forceSend); err != nil {
+		return err
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -105,6 +112,10 @@ func generateCommands(query string) error {
 	commands, err := provider.Generate(ctx, query, cfg.LLM.Count)
 	if err != nil {
 		return fmt.Errorf("failed to generate commands: %w", err)
+	}
+
+	for i, cmd := range commands {
+		commands[i] = guard.SanitizeOutput(cmd)
 	}
 
 	if len(commands) == 0 {
