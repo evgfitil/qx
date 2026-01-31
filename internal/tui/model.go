@@ -46,6 +46,7 @@ type Model struct {
 	selected  string
 	err       error
 	llmConfig llm.Config
+	forceSend bool
 	width     int
 	height    int
 	maxHeight int
@@ -53,7 +54,7 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model with optional initial query
-func NewModel(cfg llm.Config, initialQuery string) Model {
+func NewModel(cfg llm.Config, initialQuery string, forceSend bool) Model {
 	ti := textinput.New()
 	ti.Placeholder = "describe the command you need..."
 	ti.Focus()
@@ -77,6 +78,7 @@ func NewModel(cfg llm.Config, initialQuery string) Model {
 		textInput: ti,
 		spinner:   s,
 		llmConfig: cfg,
+		forceSend: forceSend,
 		maxHeight: 10,
 	}
 }
@@ -159,10 +161,8 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		sanitizer := guard.New()
-		result := sanitizer.Check(query)
-		if result.HasSecrets && !m.llmConfig.ForceSend {
-			m.err = fmt.Errorf("secrets detected: %s", formatDetections(result.Detected))
+		if err := guard.CheckQuery(query, m.forceSend); err != nil {
+			m.err = err
 			return m, nil
 		}
 
@@ -286,17 +286,14 @@ func generateCommands(query string, cfg llm.Config) tea.Cmd {
 		defer cancel()
 
 		commands, err := provider.Generate(ctx, query, cfg.Count)
-		return commandsMsg{commands: commands, err: err}
-	}
-}
+		if err != nil {
+			return commandsMsg{err: err}
+		}
 
-func formatDetections(detected []guard.Detection) string {
-	if len(detected) == 0 {
-		return ""
+		for i, cmd := range commands {
+			commands[i] = guard.SanitizeOutput(cmd)
+		}
+
+		return commandsMsg{commands: commands}
 	}
-	var descriptions []string
-	for _, d := range detected {
-		descriptions = append(descriptions, d.Description)
-	}
-	return strings.Join(descriptions, ", ")
 }

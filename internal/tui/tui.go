@@ -11,8 +11,9 @@ import (
 // Run starts the interactive TUI and returns the selected command.
 // Returns empty string if user cancelled (Esc/Ctrl+C).
 // initialQuery is optional and pre-fills the input field.
-func Run(cfg llm.Config, initialQuery string) (string, error) {
-	m := NewModel(cfg, initialQuery)
+// forceSend bypasses secret detection if true.
+func Run(cfg llm.Config, initialQuery string, forceSend bool) (string, error) {
+	m := NewModel(cfg, initialQuery, forceSend)
 
 	// Open /dev/tty for TUI output so it works even when stdout is redirected
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)

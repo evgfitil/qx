@@ -27,23 +27,21 @@ type Config struct {
 
 // LLMConfig contains LLM-related configuration
 type LLMConfig struct {
-	BaseURL   string `mapstructure:"base_url"`
-	Model     string `mapstructure:"model"`
-	Count     int    `mapstructure:"count"`
-	Provider  string `mapstructure:"provider"`
-	APIKey    string `mapstructure:"apikey"`
-	ForceSend bool   `mapstructure:"-"`
+	BaseURL  string `mapstructure:"base_url"`
+	Model    string `mapstructure:"model"`
+	Count    int    `mapstructure:"count"`
+	Provider string `mapstructure:"provider"`
+	APIKey   string `mapstructure:"apikey"`
 }
 
 // ToLLMConfig converts LLMConfig to llm.Config for provider creation
 func (c LLMConfig) ToLLMConfig() llm.Config {
 	return llm.Config{
-		BaseURL:   c.BaseURL,
-		APIKey:    c.APIKey,
-		Model:     c.Model,
-		Provider:  c.Provider,
-		Count:     c.Count,
-		ForceSend: c.ForceSend,
+		BaseURL:  c.BaseURL,
+		APIKey:   c.APIKey,
+		Model:    c.Model,
+		Provider: c.Provider,
+		Count:    c.Count,
 	}
 }
 

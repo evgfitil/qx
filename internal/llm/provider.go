@@ -4,12 +4,11 @@ import "context"
 
 // Config contains configuration for LLM provider
 type Config struct {
-	BaseURL   string
-	APIKey    string
-	Model     string
-	Provider  string
-	Count     int  // number of command variants to generate
-	ForceSend bool // send query even if sensitive data detected
+	BaseURL  string
+	APIKey   string
+	Model    string
+	Provider string
+	Count    int // number of command variants to generate
 }
 
 // Provider generates shell commands using LLM

@@ -3,8 +3,6 @@ package llm
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/evgfitil/qx/internal/guard"
 )
 
 // commandsResponse represents the expected JSON structure from LLM
@@ -49,8 +47,7 @@ func ParseCommands(jsonResponse []byte) ([]string, error) {
 	validCommands := make([]string, 0, len(response.Commands))
 	for _, cmd := range response.Commands {
 		if cmd != "" {
-			clean := guard.SanitizeOutput(cmd)
-			validCommands = append(validCommands, FormatCommand(clean))
+			validCommands = append(validCommands, FormatCommand(cmd))
 		}
 	}
 

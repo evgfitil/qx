@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -70,8 +69,7 @@ func runInteractive(initialQuery string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	cfg.LLM.ForceSend = forceSend
-	selected, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery)
+	selected, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
@@ -94,16 +92,8 @@ func handleShellIntegration(shellName string) error {
 
 // generateCommands generates shell commands using LLM based on user query.
 func generateCommands(query string) error {
-	sanitizer := guard.New()
-	result := sanitizer.Check(query)
-	if result.HasSecrets && !forceSend {
-		fmt.Fprintln(os.Stderr, "Warning: potential secrets detected:")
-		for _, d := range result.Detected {
-			fmt.Fprintf(os.Stderr, "  - %s\n", d.Description)
-		}
-		fmt.Fprintln(os.Stderr, "\nQuery will NOT be sent to LLM.")
-		fmt.Fprintln(os.Stderr, "Use --force-send to override.")
-		return fmt.Errorf("secrets detected in query")
+	if err := guard.CheckQuery(query, forceSend); err != nil {
+		return err
 	}
 
 	cfg, err := config.Load()
@@ -122,6 +112,10 @@ func generateCommands(query string) error {
 	commands, err := provider.Generate(ctx, query, cfg.LLM.Count)
 	if err != nil {
 		return fmt.Errorf("failed to generate commands: %w", err)
+	}
+
+	for i, cmd := range commands {
+		commands[i] = guard.SanitizeOutput(cmd)
 	}
 
 	if len(commands) == 0 {
