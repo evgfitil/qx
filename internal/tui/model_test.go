@@ -171,3 +171,68 @@ func TestModel_Result_ModifiedQueryOnEsc(t *testing.T) {
 		t.Errorf("expected Query = %q, got %q", expectedQuery, cancelled.Query)
 	}
 }
+
+func TestModel_Result_CancelledFromSelectState(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	originalQuery := "list files"
+	m := NewModel(cfg, originalQuery, false)
+
+	// Simulate the flow: user enters query, presses Enter, receives commands
+	m.originalQuery = originalQuery
+	m.commands = []string{"ls -la", "ls -lah", "ls -l"}
+	m.filtered = m.commands
+	m.state = stateSelect
+	m.textInput.SetValue("") // This happens when transitioning to stateSelect
+
+	// Simulate Esc press while in select state
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatal("expected result to be CancelledResult after Esc in select state")
+	}
+
+	// Should return the original query, not empty string
+	if cancelled.Query != originalQuery {
+		t.Errorf("expected Query = %q, got %q", originalQuery, cancelled.Query)
+	}
+}
+
+func TestModel_Result_CancelledFromLoadingState(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	originalQuery := "list files"
+	m := NewModel(cfg, originalQuery, false)
+
+	// Simulate the flow: user enters query and presses Enter, now in loading state
+	m.state = stateLoading
+	m.originalQuery = originalQuery
+
+	// Simulate Esc press while loading
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatal("expected result to be CancelledResult after Esc in loading state")
+	}
+
+	// Should return the original query
+	if cancelled.Query != originalQuery {
+		t.Errorf("expected Query = %q, got %q", originalQuery, cancelled.Query)
+	}
+}

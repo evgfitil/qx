@@ -37,21 +37,21 @@ type commandsMsg struct {
 
 // Model represents the TUI state
 type Model struct {
-	state        state
-	textInput    textinput.Model
-	spinner      spinner.Model
-	commands     []string
-	cursor       int
-	filtered     []string
-	selected     string
-	err          error
-	llmConfig    llm.Config
-	forceSend    bool
-	width        int
-	height       int
-	maxHeight    int
-	quitting  bool
-	cancelled bool
+	state         state
+	textInput     textinput.Model
+	spinner       spinner.Model
+	commands      []string
+	cursor        int
+	filtered      []string
+	selected      string
+	err           error
+	llmConfig     llm.Config
+	forceSend     bool
+	width         int
+	height        int
+	maxHeight     int
+	quitting      bool
+	originalQuery string
 }
 
 // NewModel creates a new TUI model with optional initial query
@@ -103,7 +103,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.quitting = true
-			m.cancelled = true
 			return m, tea.Quit
 
 		case tea.KeyEnter:
@@ -169,6 +168,7 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 		}
 
 		m.state = stateLoading
+		m.originalQuery = query
 		return m, tea.Batch(
 			m.spinner.Tick,
 			generateCommands(query, m.llmConfig),
@@ -282,6 +282,10 @@ func (m Model) Selected() string {
 func (m Model) Result() Result {
 	if m.selected != "" {
 		return SelectedResult{Command: m.selected}
+	}
+	// In select state, textInput contains filter text, not the original query
+	if m.state == stateSelect && m.originalQuery != "" {
+		return CancelledResult{Query: m.originalQuery}
 	}
 	return CancelledResult{Query: m.textInput.Value()}
 }
