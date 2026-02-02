@@ -26,11 +26,7 @@ var (
 )
 
 // CancelledError indicates user cancelled the operation.
-// ExitCode should be used when terminating the program.
-type CancelledError struct {
-	Query    string
-	ExitCode int
-}
+type CancelledError struct{}
 
 func (e *CancelledError) Error() string {
 	return "operation cancelled"
@@ -92,7 +88,7 @@ func runInteractive(initialQuery string) error {
 		if r.Query != "" {
 			fmt.Println(r.Query)
 		}
-		return &CancelledError{Query: r.Query, ExitCode: ExitCodeCancelled}
+		return &CancelledError{}
 	case tui.SelectedResult:
 		if r.Command != "" {
 			fmt.Println(r.Command)

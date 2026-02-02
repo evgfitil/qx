@@ -24,13 +24,9 @@ func TestModel_Result_CancelledOnEsc(t *testing.T) {
 	model := updated.(Model)
 
 	result := model.Result()
-	if !result.IsCancelled() {
-		t.Error("expected Result().IsCancelled() to be true after Esc")
-	}
-
 	cancelled, ok := result.(CancelledResult)
 	if !ok {
-		t.Fatal("expected result to be CancelledResult")
+		t.Fatal("expected result to be CancelledResult after Esc")
 	}
 	if cancelled.Query != initialQuery {
 		t.Errorf("expected Query = %q, got %q", initialQuery, cancelled.Query)
@@ -58,13 +54,9 @@ func TestModel_Result_SelectedOnEnter(t *testing.T) {
 	model := updated.(Model)
 
 	result := model.Result()
-	if result.IsCancelled() {
-		t.Error("expected Result().IsCancelled() to be false after selection")
-	}
-
 	selected, ok := result.(SelectedResult)
 	if !ok {
-		t.Fatal("expected result to be SelectedResult")
+		t.Fatal("expected result to be SelectedResult after selection")
 	}
 	if selected.Command != "ls -lah" {
 		t.Errorf("expected Command = %q, got %q", "ls -lah", selected.Command)
@@ -87,13 +79,9 @@ func TestModel_Result_CancelledWithCtrlC(t *testing.T) {
 	model := updated.(Model)
 
 	result := model.Result()
-	if !result.IsCancelled() {
-		t.Error("expected Result().IsCancelled() to be true after Ctrl+C")
-	}
-
 	cancelled, ok := result.(CancelledResult)
 	if !ok {
-		t.Fatal("expected result to be CancelledResult")
+		t.Fatal("expected result to be CancelledResult after Ctrl+C")
 	}
 	if cancelled.Query != initialQuery {
 		t.Errorf("expected Query = %q, got %q", initialQuery, cancelled.Query)
@@ -114,22 +102,9 @@ func TestModel_Result_NoActionYet(t *testing.T) {
 	result := m.Result()
 
 	// Should return CancelledResult with current query when no action taken
-	if !result.IsCancelled() {
-		t.Error("expected Result().IsCancelled() to be true when no action taken")
-	}
-}
-
-func TestCancelledResult_IsCancelled(t *testing.T) {
-	r := CancelledResult{Query: "test"}
-	if !r.IsCancelled() {
-		t.Error("CancelledResult.IsCancelled() should return true")
-	}
-}
-
-func TestSelectedResult_IsCancelled(t *testing.T) {
-	r := SelectedResult{Command: "ls"}
-	if r.IsCancelled() {
-		t.Error("SelectedResult.IsCancelled() should return false")
+	_, ok := result.(CancelledResult)
+	if !ok {
+		t.Error("expected result to be CancelledResult when no action taken")
 	}
 }
 
@@ -149,13 +124,9 @@ func TestModel_Result_EmptyQueryOnEsc(t *testing.T) {
 	model := updated.(Model)
 
 	result := model.Result()
-	if !result.IsCancelled() {
-		t.Error("expected Result().IsCancelled() to be true after Esc")
-	}
-
 	cancelled, ok := result.(CancelledResult)
 	if !ok {
-		t.Fatal("expected result to be CancelledResult")
+		t.Fatal("expected result to be CancelledResult after Esc")
 	}
 	if cancelled.Query != "" {
 		t.Errorf("expected Query = %q, got %q", "", cancelled.Query)
@@ -190,13 +161,9 @@ func TestModel_Result_ModifiedQueryOnEsc(t *testing.T) {
 	model := updated.(Model)
 
 	result := model.Result()
-	if !result.IsCancelled() {
-		t.Error("expected Result().IsCancelled() to be true after Esc")
-	}
-
 	cancelled, ok := result.(CancelledResult)
 	if !ok {
-		t.Fatal("expected result to be CancelledResult")
+		t.Fatal("expected result to be CancelledResult after Esc")
 	}
 
 	// Should return the modified query, not the initial one

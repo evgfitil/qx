@@ -50,9 +50,8 @@ type Model struct {
 	width        int
 	height       int
 	maxHeight    int
-	quitting     bool
-	cancelled    bool
-	initialQuery string
+	quitting  bool
+	cancelled bool
 }
 
 // NewModel creates a new TUI model with optional initial query
@@ -76,13 +75,12 @@ func NewModel(cfg llm.Config, initialQuery string, forceSend bool) Model {
 	s.Style = loadingStyle()
 
 	return Model{
-		state:        stateInput,
-		textInput:    ti,
-		spinner:      s,
-		llmConfig:    cfg,
-		forceSend:    forceSend,
-		maxHeight:    10,
-		initialQuery: initialQuery,
+		state:     stateInput,
+		textInput: ti,
+		spinner:   s,
+		llmConfig: cfg,
+		forceSend: forceSend,
+		maxHeight: 10,
 	}
 }
 
