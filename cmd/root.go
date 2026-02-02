@@ -37,9 +37,10 @@ var rootCmd = &cobra.Command{
 	Short: "Generate shell commands using LLM",
 	Long: `qx is a CLI tool that generates shell commands from natural language descriptions.
 It uses LLM to generate multiple command variants and presents them in a fzf-style picker.`,
-	Version: Version,
-	Args:    cobra.MaximumNArgs(1),
-	RunE:    run,
+	Version:       Version,
+	Args:          cobra.MaximumNArgs(1),
+	RunE:          run,
+	SilenceErrors: true,
 }
 
 func init() {

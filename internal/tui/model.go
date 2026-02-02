@@ -283,8 +283,9 @@ func (m Model) Result() Result {
 	if m.selected != "" {
 		return SelectedResult{Command: m.selected}
 	}
-	// In select state, textInput contains filter text, not the original query
-	if m.state == stateSelect && m.originalQuery != "" {
+	// In select/loading states, textInput may contain filter text or still has query,
+	// but originalQuery always has the submitted query
+	if (m.state == stateSelect || m.state == stateLoading) && m.originalQuery != "" {
 		return CancelledResult{Query: m.originalQuery}
 	}
 	return CancelledResult{Query: m.textInput.Value()}
