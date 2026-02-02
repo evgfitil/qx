@@ -15,6 +15,8 @@ import (
 	"github.com/evgfitil/qx/internal/tui"
 )
 
+const ExitCodeCancelled = 130
+
 var (
 	Version          = "dev"
 	shellIntegration string
@@ -22,6 +24,17 @@ var (
 	queryFlag        string
 	forceSend        bool
 )
+
+// CancelledError indicates user cancelled the operation.
+// ExitCode should be used when terminating the program.
+type CancelledError struct {
+	Query    string
+	ExitCode int
+}
+
+func (e *CancelledError) Error() string {
+	return "operation cancelled"
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "qx [query]",
@@ -69,13 +82,21 @@ func runInteractive(initialQuery string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	selected, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
+	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
 
-	if selected != "" {
-		fmt.Println(selected)
+	switch r := result.(type) {
+	case tui.CancelledResult:
+		if r.Query != "" {
+			fmt.Println(r.Query)
+		}
+		return &CancelledError{Query: r.Query, ExitCode: ExitCodeCancelled}
+	case tui.SelectedResult:
+		if r.Command != "" {
+			fmt.Println(r.Command)
+		}
 	}
 
 	return nil

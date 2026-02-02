@@ -76,14 +76,14 @@ Shell (Ctrl+G) → qx --query "prompt" → TUI → Esc → stdout = "prompt", ex
 
 ### Task 2: Update cmd/root.go to handle cancellation
 
-- [ ] write test: `runInteractive` outputs original query and exits 130 on cancel
-- [ ] write test: `runInteractive` outputs selected command and exits 0 on success
-- [ ] update `runInteractive` to call `model.Result()` instead of `model.Selected()`
-- [ ] handle `CancelledResult`: print query to stdout, return error with exit code 130
-- [ ] handle `SelectedResult`: print command to stdout, return nil
-- [ ] add custom error type for cancellation with exit code
-- [ ] update main error handling to use correct exit code
-- [ ] run tests - must pass before next task
+- [x] write test: `runInteractive` outputs original query and exits 130 on cancel
+- [x] write test: `runInteractive` outputs selected command and exits 0 on success
+- [x] update `runInteractive` to call `model.Result()` instead of `model.Selected()`
+- [x] handle `CancelledResult`: print query to stdout, return error with exit code 130
+- [x] handle `SelectedResult`: print command to stdout, return nil
+- [x] add custom error type for cancellation with exit code
+- [x] update main error handling to use correct exit code
+- [x] run tests - must pass before next task
 
 ### Task 3: Update shell integration scripts
 
