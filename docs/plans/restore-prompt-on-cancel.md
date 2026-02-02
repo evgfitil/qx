@@ -87,12 +87,12 @@ Shell (Ctrl+G) → qx --query "prompt" → TUI → Esc → stdout = "prompt", ex
 
 ### Task 3: Update shell integration scripts
 
-- [ ] update `bash.sh`: handle exit code 130, restore READLINE_LINE from stdout
-- [ ] update `zsh.zsh`: handle exit code 130, restore LBUFFER from stdout
-- [ ] update `fish.fish` (if exists): handle exit code 130
-- [ ] manual test: verify prompt restoration works in bash
-- [ ] manual test: verify prompt restoration works in zsh
-- [ ] run tests - must pass before next task
+- [x] update `bash.sh`: handle exit code 130, restore READLINE_LINE from stdout
+- [x] update `zsh.zsh`: handle exit code 130, restore LBUFFER from stdout
+- [x] update `fish.fish` (if exists): handle exit code 130 — fish.fish not implemented, skipped
+- [x] manual test: verify prompt restoration works in bash
+- [x] manual test: verify prompt restoration works in zsh
+- [x] run tests - must pass before next task
 
 ### Task 4: Handle edge cases
 

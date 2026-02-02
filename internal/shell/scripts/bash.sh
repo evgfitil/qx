@@ -6,6 +6,9 @@ __qx_widget() {
     if [[ $exit_code -eq 0 && -n "$result" ]]; then
         READLINE_LINE="$result"
         READLINE_POINT=${#result}
+    elif [[ $exit_code -eq 130 ]]; then
+        READLINE_LINE="$result"
+        READLINE_POINT=${#result}
     fi
 }
 bind -x '"\C-g": __qx_widget'
