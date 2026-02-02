@@ -103,12 +103,12 @@ Shell (Ctrl+G) → qx --query "prompt" → TUI → Esc → stdout = "prompt", ex
 
 ### Task 5: Verify acceptance criteria
 
-- [ ] verify: Esc restores prompt in bash
-- [ ] verify: Esc restores prompt in zsh
-- [ ] verify: modified prompt in TUI is restored (not original)
-- [ ] verify: selecting command still works correctly
-- [ ] run full test suite
-- [ ] run linter - all issues must be fixed
+- [x] verify: Esc restores prompt in bash
+- [x] verify: Esc restores prompt in zsh
+- [x] verify: modified prompt in TUI is restored (not original)
+- [x] verify: selecting command still works correctly
+- [x] run full test suite
+- [x] run linter - all issues must be fixed
 
 ### Task 6: [Final] Update documentation
 
