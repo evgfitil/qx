@@ -96,10 +96,10 @@ Shell (Ctrl+G) → qx --query "prompt" → TUI → Esc → stdout = "prompt", ex
 
 ### Task 4: Handle edge cases
 
-- [ ] write test: empty initial query + Esc → exit 130, stdout empty
-- [ ] write test: modified query in TUI + Esc → return current (modified) query, not initial
-- [ ] update TUI to return current input value on cancel, not initial query
-- [ ] run tests - must pass before next task
+- [x] write test: empty initial query + Esc → exit 130, stdout empty
+- [x] write test: modified query in TUI + Esc → return current (modified) query, not initial
+- [x] update TUI to return current input value on cancel, not initial query
+- [x] run tests - must pass before next task
 
 ### Task 5: Verify acceptance criteria
 

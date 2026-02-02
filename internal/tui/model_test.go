@@ -132,3 +132,75 @@ func TestSelectedResult_IsCancelled(t *testing.T) {
 		t.Error("SelectedResult.IsCancelled() should return false")
 	}
 }
+
+func TestModel_Result_EmptyQueryOnEsc(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	// Start with empty query
+	m := NewModel(cfg, "", false)
+
+	// Simulate Esc press
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	if !result.IsCancelled() {
+		t.Error("expected Result().IsCancelled() to be true after Esc")
+	}
+
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatal("expected result to be CancelledResult")
+	}
+	if cancelled.Query != "" {
+		t.Errorf("expected Query = %q, got %q", "", cancelled.Query)
+	}
+}
+
+func TestModel_Result_ModifiedQueryOnEsc(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	initialQuery := "list files"
+	m := NewModel(cfg, initialQuery, false)
+
+	// Simulate typing additional text - send individual key messages
+	for _, r := range " with details" {
+		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = updated.(Model)
+	}
+
+	// Now the text input should contain "list files with details"
+	expectedQuery := "list files with details"
+	if m.textInput.Value() != expectedQuery {
+		t.Fatalf("precondition failed: expected input value %q, got %q", expectedQuery, m.textInput.Value())
+	}
+
+	// Simulate Esc press
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	if !result.IsCancelled() {
+		t.Error("expected Result().IsCancelled() to be true after Esc")
+	}
+
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatal("expected result to be CancelledResult")
+	}
+
+	// Should return the modified query, not the initial one
+	if cancelled.Query != expectedQuery {
+		t.Errorf("expected Query = %q, got %q", expectedQuery, cancelled.Query)
+	}
+}
