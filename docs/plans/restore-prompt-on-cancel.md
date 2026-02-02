@@ -112,7 +112,7 @@ Shell (Ctrl+G) → qx --query "prompt" → TUI → Esc → stdout = "prompt", ex
 
 ### Task 6: [Final] Update documentation
 
-- [ ] update README.md if shell integration section mentions behavior
+- [x] update README.md if shell integration section mentions behavior
 
 ## Technical Details
 

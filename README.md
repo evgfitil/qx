@@ -73,6 +73,9 @@ source ~/.zshrc  # or ~/.bashrc
 **Inline editing**: Start typing a command, press Ctrl+G, and qx will use your
 input as initial query. Add instructions to modify or extend the command.
 
+**Prompt restoration**: Press Esc to cancel selection and restore your query
+to the command line for editing.
+
 ### Direct mode
 
 ```bash
