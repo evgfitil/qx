@@ -64,15 +64,15 @@ Shell (Ctrl+G) → qx --query "prompt" → TUI → Esc → stdout = "prompt", ex
 
 Нужен способ различать "выбрал команду", "отменил" и "ничего не выбрал".
 
-- [ ] write test: `Model.Result()` returns `CancelledResult{Query: "..."}` when Esc pressed
-- [ ] write test: `Model.Result()` returns `SelectedResult{Command: "..."}` when command selected
-- [ ] add `Result` interface with `IsCancelled()` method in `internal/tui/result.go`
-- [ ] add `CancelledResult` struct with `Query` field
-- [ ] add `SelectedResult` struct with `Command` field
-- [ ] update `Model` to track cancellation state and store initial query
-- [ ] update Esc handler to set cancellation state
-- [ ] add `Model.Result()` method returning appropriate result type
-- [ ] run tests - must pass before next task
+- [x] write test: `Model.Result()` returns `CancelledResult{Query: "..."}` when Esc pressed
+- [x] write test: `Model.Result()` returns `SelectedResult{Command: "..."}` when command selected
+- [x] add `Result` interface with `IsCancelled()` method in `internal/tui/result.go`
+- [x] add `CancelledResult` struct with `Query` field
+- [x] add `SelectedResult` struct with `Command` field
+- [x] update `Model` to track cancellation state and store initial query
+- [x] update Esc handler to set cancellation state
+- [x] add `Model.Result()` method returning appropriate result type
+- [x] run tests - must pass before next task
 
 ### Task 2: Update cmd/root.go to handle cancellation
 

@@ -37,20 +37,22 @@ type commandsMsg struct {
 
 // Model represents the TUI state
 type Model struct {
-	state     state
-	textInput textinput.Model
-	spinner   spinner.Model
-	commands  []string
-	cursor    int
-	filtered  []string
-	selected  string
-	err       error
-	llmConfig llm.Config
-	forceSend bool
-	width     int
-	height    int
-	maxHeight int
-	quitting  bool
+	state        state
+	textInput    textinput.Model
+	spinner      spinner.Model
+	commands     []string
+	cursor       int
+	filtered     []string
+	selected     string
+	err          error
+	llmConfig    llm.Config
+	forceSend    bool
+	width        int
+	height       int
+	maxHeight    int
+	quitting     bool
+	cancelled    bool
+	initialQuery string
 }
 
 // NewModel creates a new TUI model with optional initial query
@@ -74,12 +76,13 @@ func NewModel(cfg llm.Config, initialQuery string, forceSend bool) Model {
 	s.Style = loadingStyle()
 
 	return Model{
-		state:     stateInput,
-		textInput: ti,
-		spinner:   s,
-		llmConfig: cfg,
-		forceSend: forceSend,
-		maxHeight: 10,
+		state:        stateInput,
+		textInput:    ti,
+		spinner:      s,
+		llmConfig:    cfg,
+		forceSend:    forceSend,
+		maxHeight:    10,
+		initialQuery: initialQuery,
 	}
 }
 
@@ -102,6 +105,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			m.quitting = true
+			m.cancelled = true
 			return m, tea.Quit
 
 		case tea.KeyEnter:
@@ -273,6 +277,15 @@ func (m Model) View() string {
 // Selected returns the selected command
 func (m Model) Selected() string {
 	return m.selected
+}
+
+// Result returns the outcome of TUI interaction.
+// Returns SelectedResult if a command was selected, CancelledResult otherwise.
+func (m Model) Result() Result {
+	if m.selected != "" {
+		return SelectedResult{Command: m.selected}
+	}
+	return CancelledResult{Query: m.textInput.Value()}
 }
 
 func generateCommands(query string, cfg llm.Config) tea.Cmd {
