@@ -94,9 +94,10 @@ func runInteractive(initialQuery string) error {
 		if r.Command != "" {
 			fmt.Println(r.Command)
 		}
+		return nil
+	default:
+		return fmt.Errorf("unexpected result type: %T", result)
 	}
-
-	return nil
 }
 
 func handleShellIntegration(shellName string) error {

@@ -272,11 +272,6 @@ func (m Model) View() string {
 	return b.String()
 }
 
-// Selected returns the selected command
-func (m Model) Selected() string {
-	return m.selected
-}
-
 // Result returns the outcome of TUI interaction.
 // Returns SelectedResult if a command was selected, CancelledResult otherwise.
 func (m Model) Result() Result {
