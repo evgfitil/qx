@@ -25,12 +25,8 @@ var (
 	forceSend        bool
 )
 
-// CancelledError indicates user cancelled the operation.
-type CancelledError struct{}
-
-func (e *CancelledError) Error() string {
-	return "operation cancelled"
-}
+// ErrCancelled indicates user cancelled the operation.
+var ErrCancelled = errors.New("operation cancelled")
 
 var rootCmd = &cobra.Command{
 	Use:   "qx [query]",
@@ -90,7 +86,7 @@ func runInteractive(initialQuery string) error {
 		if r.Query != "" {
 			fmt.Println(r.Query)
 		}
-		return &CancelledError{}
+		return ErrCancelled
 	case tui.SelectedResult:
 		if r.Command != "" {
 			fmt.Println(r.Command)
@@ -146,7 +142,7 @@ func generateCommands(query string) error {
 	if err != nil {
 		if errors.Is(err, picker.ErrAborted) {
 			fmt.Println(query)
-			return &CancelledError{}
+			return ErrCancelled
 		}
 		return fmt.Errorf("failed to pick command: %w", err)
 	}

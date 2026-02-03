@@ -10,8 +10,7 @@ import (
 
 func main() {
 	if err := cmd.Execute(); err != nil {
-		var cancelErr *cmd.CancelledError
-		if errors.As(err, &cancelErr) {
+		if errors.Is(err, cmd.ErrCancelled) {
 			os.Exit(cmd.ExitCodeCancelled)
 		}
 		fmt.Fprintln(os.Stderr, err)

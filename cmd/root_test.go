@@ -6,25 +6,10 @@ import (
 	"testing"
 )
 
-func TestCancelledError_Error(t *testing.T) {
-	err := &CancelledError{}
-	if err.Error() != "operation cancelled" {
-		t.Errorf("expected 'operation cancelled', got %q", err.Error())
-	}
-}
+func TestErrCancelled_CanBeExtracted(t *testing.T) {
+	wrapped := fmt.Errorf("run failed: %w", ErrCancelled)
 
-func TestCancelledError_CanBeExtracted(t *testing.T) {
-	original := &CancelledError{}
-	wrapped := fmt.Errorf("run failed: %w", original)
-
-	var cancelErr *CancelledError
-	if !errors.As(wrapped, &cancelErr) {
-		t.Fatal("expected errors.As to find CancelledError in wrapped error")
-	}
-}
-
-func TestExitCodeCancelled(t *testing.T) {
-	if ExitCodeCancelled != 130 {
-		t.Errorf("expected ExitCodeCancelled to be 130, got %d", ExitCodeCancelled)
+	if !errors.Is(wrapped, ErrCancelled) {
+		t.Fatal("expected errors.Is to find ErrCancelled in wrapped error")
 	}
 }
