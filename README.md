@@ -14,6 +14,8 @@ Generate shell commands from natural language using LLM.
 - Multiple command variants with fuzzy selection
 - Interactive TUI with real-time filtering
 - Shell integration (Ctrl+G hotkey) with inline editing support
+- Pipe/stdin support for context-aware command generation
+- Command description mode to explain existing commands
 - Support for OpenAI-compatible APIs
 
 ## Installation
@@ -65,11 +67,17 @@ export OPENAI_API_KEY="your-key-here"
 ### Shell integration (Recommended)
 
 ```bash
-# Add to ~/.bashrc or ~/.zshrc
+# Bash: add to ~/.bashrc
+eval "$(qx --shell-integration bash)"
+
+# Zsh: add to ~/.zshrc
 eval "$(qx --shell-integration zsh)"
 
+# Fish: add to ~/.config/fish/config.fish
+qx --shell-integration fish | source
+
 # Then reload your shell config
-source ~/.zshrc  # or ~/.bashrc
+source ~/.bashrc  # or ~/.zshrc, or restart Fish
 
 # Now press Ctrl+G in terminal to invoke qx
 ```
@@ -98,6 +106,33 @@ qx
 ```bash
 qx --query "git log"
 # TUI opens with input field pre-filled
+```
+
+### Pipe/stdin support
+
+qx can read context from stdin to generate more relevant commands:
+
+```bash
+# Use file content as context
+cat error.log | qx "find the cause"
+
+# Use command output as context
+docker ps | qx "stop the nginx container"
+
+# Use git diff as context
+git diff | qx "create a commit message"
+```
+
+### Command description mode
+
+Explain what a command does instead of generating new ones:
+
+```bash
+qx -d "find . -name '*.go' -exec grep TODO {} +"
+# Outputs explanation of the command
+
+qx --describe "awk '{print \$1}' file.txt"
+# Explains what awk is doing
 ```
 
 ## License
