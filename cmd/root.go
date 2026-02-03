@@ -12,6 +12,7 @@ import (
 	"github.com/evgfitil/qx/internal/llm"
 	"github.com/evgfitil/qx/internal/picker"
 	"github.com/evgfitil/qx/internal/shell"
+	"github.com/evgfitil/qx/internal/stdin"
 	"github.com/evgfitil/qx/internal/tui"
 )
 
@@ -23,6 +24,7 @@ var (
 	showConfig       bool
 	queryFlag        string
 	forceSend        bool
+	stdinContent     string
 )
 
 // ErrCancelled indicates user cancelled the operation.
@@ -52,6 +54,11 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
+// StdinContent returns the content read from stdin (if any).
+func StdinContent() string {
+	return stdinContent
+}
+
 func run(cmd *cobra.Command, args []string) error {
 	if showConfig {
 		fmt.Println(config.Path())
@@ -61,6 +68,12 @@ func run(cmd *cobra.Command, args []string) error {
 	if shellIntegration != "" {
 		return handleShellIntegration(shellIntegration)
 	}
+
+	content, err := stdin.ReadFromStdin()
+	if err != nil {
+		return fmt.Errorf("failed to read stdin: %w", err)
+	}
+	stdinContent = content
 
 	if len(args) == 0 {
 		return runInteractive(queryFlag)
