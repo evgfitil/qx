@@ -1,5 +1,9 @@
 # qx
 
+[![Build](https://github.com/evgfitil/qx/actions/workflows/ci.yml/badge.svg)](https://github.com/evgfitil/qx/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/evgfitil/qx/branch/main/graph/badge.svg)](https://codecov.io/gh/evgfitil/qx)
+[![Go Report Card](https://goreportcard.com/badge/github.com/evgfitil/qx)](https://goreportcard.com/report/github.com/evgfitil/qx)
+
 Generate shell commands from natural language using LLM.
 
 ![qx demo](assets/demo.gif)
