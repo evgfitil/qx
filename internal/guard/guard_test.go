@@ -307,3 +307,161 @@ func TestSanitizer_MultipleSecrets(t *testing.T) {
 		t.Errorf("expected at least 2 detections, got %d", len(result.Detected))
 	}
 }
+
+func TestIsExplanation(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "valid command - ls",
+			input:    "ls -la",
+			expected: false,
+		},
+		{
+			name:     "valid command - docker",
+			input:    "docker ps -a",
+			expected: false,
+		},
+		{
+			name:     "valid command - find",
+			input:    "find . -name '*.go' -exec grep TODO {} +",
+			expected: false,
+		},
+		{
+			name:     "explanation - the command",
+			input:    "The command ls -la lists all files",
+			expected: true,
+		},
+		{
+			name:     "explanation - this command",
+			input:    "This command will show you the files",
+			expected: true,
+		},
+		{
+			name:     "explanation - this will",
+			input:    "This will list all files in the directory",
+			expected: true,
+		},
+		{
+			name:     "explanation - here is",
+			input:    "Here is the command you need: ls -la",
+			expected: true,
+		},
+		{
+			name:     "explanation - here's",
+			input:    "Here's how to do it: ls -la",
+			expected: true,
+		},
+		{
+			name:     "explanation - you can use",
+			input:    "You can use the following command",
+			expected: true,
+		},
+		{
+			name:     "explanation - i suggest",
+			input:    "I suggest using docker ps instead",
+			expected: true,
+		},
+		{
+			name:     "explanation - note",
+			input:    "Note: this command requires sudo",
+			expected: true,
+		},
+		{
+			name:     "explanation - the following",
+			input:    "The following command will help",
+			expected: true,
+		},
+		{
+			name:     "explanation - i recommend",
+			input:    "I recommend running this first",
+			expected: true,
+		},
+		{
+			name:     "explanation - lowercase the command",
+			input:    "the command lists files",
+			expected: true,
+		},
+		{
+			name:     "explanation - with leading whitespace",
+			input:    "  The command ls lists files",
+			expected: true,
+		},
+		{
+			name:     "valid command - echo the command",
+			input:    "echo 'the command'",
+			expected: false,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: false,
+		},
+		{
+			name:     "whitespace only",
+			input:    "   ",
+			expected: false,
+		},
+		{
+			name:     "valid command - pipe",
+			input:    "docker ps | grep nginx",
+			expected: false,
+		},
+		{
+			name:     "valid command - multiline",
+			input:    "ls -la && echo 'done'",
+			expected: false,
+		},
+		{
+			name:     "explanation - this would",
+			input:    "This would display all running containers",
+			expected: true,
+		},
+		{
+			name:     "explanation - to do this",
+			input:    "To do this, run the following command",
+			expected: true,
+		},
+		{
+			name:     "explanation - you could use",
+			input:    "You could use grep for searching",
+			expected: true,
+		},
+		{
+			name:     "explanation - you should",
+			input:    "You should run this as root",
+			expected: true,
+		},
+		{
+			name:     "explanation - i would",
+			input:    "I would recommend using docker",
+			expected: true,
+		},
+		{
+			name:     "explanation - i'd suggest",
+			input:    "I'd suggest trying this approach",
+			expected: true,
+		},
+		{
+			name:     "explanation - explanation prefix",
+			input:    "Explanation: the command does X",
+			expected: true,
+		},
+		{
+			name:     "explanation - below is",
+			input:    "Below is the command you need",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsExplanation(tt.input)
+			if got != tt.expected {
+				t.Errorf("IsExplanation(%q) = %v, want %v", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
