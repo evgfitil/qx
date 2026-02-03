@@ -1,11 +1,16 @@
 package stdin
 
 import (
+	"fmt"
 	"io"
 	"os"
 
 	"golang.org/x/term"
 )
+
+// MaxStdinSize is the maximum size of stdin content that will be read.
+// Larger inputs are rejected to prevent memory exhaustion.
+const MaxStdinSize = 1024 * 1024 // 1MB
 
 // Reader provides methods for reading stdin content.
 type Reader struct {
@@ -28,14 +33,20 @@ func (r *Reader) IsPiped() bool {
 
 // Read reads all content from stdin if it's piped.
 // Returns empty string and nil error if stdin is a terminal.
+// Returns error if stdin content exceeds MaxStdinSize.
 func (r *Reader) Read() (string, error) {
 	if !r.IsPiped() {
 		return "", nil
 	}
 
-	data, err := io.ReadAll(r.input)
+	limitedReader := io.LimitReader(r.input, MaxStdinSize+1)
+	data, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return "", err
+	}
+
+	if len(data) > MaxStdinSize {
+		return "", fmt.Errorf("stdin content exceeds maximum size of %d bytes", MaxStdinSize)
 	}
 
 	return string(data), nil

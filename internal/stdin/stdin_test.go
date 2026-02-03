@@ -71,3 +71,29 @@ func TestReader_IsPiped_WithStringsReader(t *testing.T) {
 		t.Error("IsPiped() should return true for strings.Reader")
 	}
 }
+
+func TestReader_Read_ExceedsMaxSize(t *testing.T) {
+	largeInput := strings.Repeat("a", MaxStdinSize+1)
+	reader := New(strings.NewReader(largeInput))
+
+	_, err := reader.Read()
+	if err == nil {
+		t.Error("Read() should return error for input exceeding max size")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum size") {
+		t.Errorf("Read() error should mention size limit, got: %v", err)
+	}
+}
+
+func TestReader_Read_AtMaxSize(t *testing.T) {
+	exactInput := strings.Repeat("a", MaxStdinSize)
+	reader := New(strings.NewReader(exactInput))
+
+	got, err := reader.Read()
+	if err != nil {
+		t.Errorf("Read() should not error for input at max size, got: %v", err)
+	}
+	if len(got) != MaxStdinSize {
+		t.Errorf("Read() returned %d bytes, want %d", len(got), MaxStdinSize)
+	}
+}

@@ -176,9 +176,14 @@ func generateCommands(query string) error {
 		return fmt.Errorf("failed to generate commands: %w", err)
 	}
 
-	for i, cmd := range commands {
-		commands[i] = guard.SanitizeOutput(cmd)
+	filtered := make([]string, 0, len(commands))
+	for _, cmd := range commands {
+		sanitized := guard.SanitizeOutput(cmd)
+		if !guard.IsExplanation(sanitized) {
+			filtered = append(filtered, sanitized)
+		}
 	}
+	commands = filtered
 
 	if len(commands) == 0 {
 		return fmt.Errorf("no commands generated")

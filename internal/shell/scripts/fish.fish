@@ -6,7 +6,7 @@ function __qx_widget
     set -l query (commandline)
     set -l result ($qx_cmd --query "$query" 2>/dev/tty </dev/tty)
     set -l exit_code $status
-    if test \( $exit_code -eq 0 -o $exit_code -eq 130 \) -a -n "$result"
+    if test $exit_code -eq 0 -o $exit_code -eq 130; and test -n "$result"
         commandline -r "$result"
     end
     commandline -f repaint
