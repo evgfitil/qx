@@ -14,6 +14,7 @@ type Config struct {
 // Provider generates shell commands using LLM
 type Provider interface {
 	Generate(ctx context.Context, query string, count int, stdinContent string) ([]string, error)
+	Describe(ctx context.Context, command string) (string, error)
 }
 
 // NewProvider creates appropriate provider based on configuration

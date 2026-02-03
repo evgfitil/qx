@@ -48,6 +48,30 @@ User query: %s
 Generate shell commands that use the context above.`, stdinContent, query)
 }
 
+// DescribeSystemPrompt generates the system prompt for command description mode.
+func DescribeSystemPrompt() string {
+	return `You are a shell command expert. Explain shell commands clearly and concisely.
+
+Rules:
+- Explain what each part of the command does
+- Describe any flags or options used
+- Explain the expected behavior and output
+- Keep explanations clear and practical
+- Do not suggest alternative commands unless the command is incorrect`
+}
+
+// DescribeUserPrompt formats the user query for command description mode.
+func DescribeUserPrompt(command string) string {
+	return fmt.Sprintf(`Explain what the following shell command does:
+
+Command: %s
+
+Provide a clear, concise explanation of:
+1. What each part of the command does
+2. Any flags or options used
+3. Expected behavior and output`, command)
+}
+
 // ParseCommands parses JSON response from LLM into a list of commands
 func ParseCommands(jsonResponse []byte) ([]string, error) {
 	if len(jsonResponse) == 0 {

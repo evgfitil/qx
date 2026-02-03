@@ -117,6 +117,58 @@ func TestUserPromptFormat(t *testing.T) {
 	}
 }
 
+func TestDescribeSystemPrompt(t *testing.T) {
+	got := DescribeSystemPrompt()
+
+	if got == "" {
+		t.Error("DescribeSystemPrompt returned empty string")
+	}
+	if !contains(got, "Explain") {
+		t.Error("DescribeSystemPrompt should mention explaining commands")
+	}
+	if !contains(got, "flags") {
+		t.Error("DescribeSystemPrompt should mention flags")
+	}
+}
+
+func TestDescribeUserPrompt(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		want    []string
+	}{
+		{
+			name:    "simple command",
+			command: "ls -la",
+			want:    []string{"ls -la", "Explain"},
+		},
+		{
+			name:    "complex command with pipes",
+			command: "find . -name '*.go' | xargs grep TODO",
+			want:    []string{"find . -name '*.go' | xargs grep TODO", "Command:"},
+		},
+		{
+			name:    "command with quotes",
+			command: `echo "hello world"`,
+			want:    []string{`echo "hello world"`, "flags"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := DescribeUserPrompt(tt.command)
+			if got == "" {
+				t.Error("DescribeUserPrompt returned empty string")
+			}
+			for _, expected := range tt.want {
+				if !contains(got, expected) {
+					t.Errorf("DescribeUserPrompt does not contain expected text: %q", expected)
+				}
+			}
+		})
+	}
+}
+
 func TestParseCommands(t *testing.T) {
 	tests := []struct {
 		name    string

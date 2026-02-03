@@ -97,3 +97,47 @@ func (p *baseProvider) Generate(ctx context.Context, query string, count int, st
 
 	return commands, nil
 }
+
+// Describe provides explanation for a shell command.
+func (p *baseProvider) Describe(ctx context.Context, command string) (string, error) {
+	if command == "" {
+		return "", fmt.Errorf("command cannot be empty")
+	}
+
+	req := openai.ChatCompletionRequest{
+		Model: p.model,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: DescribeSystemPrompt(),
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: DescribeUserPrompt(command),
+			},
+		},
+		Temperature: DefaultTemperature,
+	}
+
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, DefaultRequestTimeout)
+		defer cancel()
+	}
+
+	resp, err := p.client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return "", categorizeAPIError(err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("LLM returned no choices")
+	}
+
+	content := strings.TrimSpace(resp.Choices[0].Message.Content)
+	if content == "" {
+		return "", fmt.Errorf("LLM returned empty response")
+	}
+
+	return content, nil
+}

@@ -25,6 +25,7 @@ var (
 	queryFlag        string
 	forceSend        bool
 	stdinContent     string
+	describeMode     bool
 )
 
 // ErrCancelled indicates user cancelled the operation.
@@ -43,10 +44,11 @@ It uses LLM to generate multiple command variants and presents them in a fzf-sty
 }
 
 func init() {
-	rootCmd.Flags().StringVar(&shellIntegration, "shell-integration", "", "output shell integration script (bash|zsh)")
+	rootCmd.Flags().StringVar(&shellIntegration, "shell-integration", "", "output shell integration script (bash|zsh|fish)")
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
 	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
+	rootCmd.Flags().BoolVarP(&describeMode, "describe", "d", false, "explain what a command does instead of generating commands")
 }
 
 // Execute runs the root command
@@ -76,7 +78,14 @@ func run(cmd *cobra.Command, args []string) error {
 	stdinContent = content
 
 	if len(args) == 0 {
+		if describeMode {
+			return fmt.Errorf("describe mode requires a command argument")
+		}
 		return runInteractive(queryFlag)
+	}
+
+	if describeMode {
+		return describeCommand(args[0])
 	}
 
 	query := args[0]
@@ -116,6 +125,30 @@ func handleShellIntegration(shellName string) error {
 		return err
 	}
 	fmt.Print(script)
+	return nil
+}
+
+// describeCommand explains a shell command using LLM.
+func describeCommand(command string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	provider, err := llm.NewProvider(cfg.LLM.ToLLMConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create LLM provider: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
+	defer cancel()
+
+	description, err := provider.Describe(ctx, command)
+	if err != nil {
+		return fmt.Errorf("failed to describe command: %w", err)
+	}
+
+	fmt.Println(description)
 	return nil
 }
 
