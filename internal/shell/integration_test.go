@@ -39,7 +39,8 @@ func TestScript(t *testing.T) {
 			wantCheck: func(script string) bool {
 				return strings.Contains(script, "__qx_widget") &&
 					strings.Contains(script, "bind \\cg") &&
-					strings.Contains(script, "commandline")
+					strings.Contains(script, "commandline") &&
+					strings.Contains(script, "end-of-line")
 			},
 		},
 		{

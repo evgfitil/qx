@@ -8,6 +8,7 @@ function __qx_widget
     set -l exit_code $status
     if test $exit_code -eq 0 -o $exit_code -eq 130; and test -n "$result"
         commandline -r "$result"
+        commandline -f end-of-line
     end
     commandline -f repaint
 end
