@@ -15,6 +15,8 @@ import (
 	"github.com/evgfitil/qx/internal/tui"
 )
 
+const ExitCodeCancelled = 130
+
 var (
 	Version          = "dev"
 	shellIntegration string
@@ -23,14 +25,19 @@ var (
 	forceSend        bool
 )
 
+// ErrCancelled indicates user cancelled the operation.
+var ErrCancelled = errors.New("operation cancelled")
+
 var rootCmd = &cobra.Command{
 	Use:   "qx [query]",
 	Short: "Generate shell commands using LLM",
 	Long: `qx is a CLI tool that generates shell commands from natural language descriptions.
 It uses LLM to generate multiple command variants and presents them in a fzf-style picker.`,
-	Version: Version,
-	Args:    cobra.MaximumNArgs(1),
-	RunE:    run,
+	Version:       Version,
+	Args:          cobra.MaximumNArgs(1),
+	RunE:          run,
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func init() {
@@ -69,16 +76,25 @@ func runInteractive(initialQuery string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	selected, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
+	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
 
-	if selected != "" {
-		fmt.Println(selected)
+	switch r := result.(type) {
+	case tui.CancelledResult:
+		if r.Query != "" {
+			fmt.Println(r.Query)
+		}
+		return ErrCancelled
+	case tui.SelectedResult:
+		if r.Command != "" {
+			fmt.Println(r.Command)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unexpected result type: %T", result)
 	}
-
-	return nil
 }
 
 func handleShellIntegration(shellName string) error {
@@ -125,7 +141,8 @@ func generateCommands(query string) error {
 	selected, err := picker.Pick(commands)
 	if err != nil {
 		if errors.Is(err, picker.ErrAborted) {
-			return nil
+			fmt.Println(query)
+			return ErrCancelled
 		}
 		return fmt.Errorf("failed to pick command: %w", err)
 	}

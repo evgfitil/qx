@@ -2,6 +2,7 @@
 CLAUDE.md
 PLAN.md
 about.md
+docs/
 
 # Claude Code
 .claude/
@@ -26,3 +27,6 @@ dist/
 
 # Dependency directories
 vendor/
+
+# ralphex progress logs
+progress*.txt
