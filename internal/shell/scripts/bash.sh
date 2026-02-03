@@ -6,7 +6,7 @@ __qx_widget() {
     if [[ $exit_code -eq 0 && -n "$result" ]]; then
         READLINE_LINE="$result"
         READLINE_POINT=${#result}
-    elif [[ $exit_code -eq 130 ]]; then
+    elif [[ $exit_code -eq 130 && -n "$result" ]]; then
         READLINE_LINE="$result"
         READLINE_POINT=${#result}
     fi

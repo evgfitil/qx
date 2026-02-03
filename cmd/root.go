@@ -41,6 +41,7 @@ It uses LLM to generate multiple command variants and presents them in a fzf-sty
 	Args:          cobra.MaximumNArgs(1),
 	RunE:          run,
 	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func init() {
@@ -144,7 +145,8 @@ func generateCommands(query string) error {
 	selected, err := picker.Pick(commands)
 	if err != nil {
 		if errors.Is(err, picker.ErrAborted) {
-			return nil
+			fmt.Println(query)
+			return &CancelledError{}
 		}
 		return fmt.Errorf("failed to pick command: %w", err)
 	}
