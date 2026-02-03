@@ -304,10 +304,18 @@ func generateCommands(query string, cfg llm.Config, stdinContent string) tea.Cmd
 			return commandsMsg{err: err}
 		}
 
-		for i, cmd := range commands {
-			commands[i] = guard.SanitizeOutput(cmd)
+		filtered := make([]string, 0, len(commands))
+		for _, cmd := range commands {
+			sanitized := guard.SanitizeOutput(cmd)
+			if !guard.IsExplanation(sanitized) {
+				filtered = append(filtered, sanitized)
+			}
 		}
 
-		return commandsMsg{commands: commands}
+		if len(filtered) == 0 {
+			return commandsMsg{err: fmt.Errorf("no valid commands generated")}
+		}
+
+		return commandsMsg{commands: filtered}
 	}
 }
