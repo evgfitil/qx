@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-03
+
 ### Added
 
 - Prompt restoration on cancel: pressing Esc now restores the query text to the command line for easy editing
@@ -70,7 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shell integration (bash, zsh)
 - Goreleaser and release workflow
 
-[Unreleased]: https://github.com/evgfitil/qx/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/evgfitil/qx/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/evgfitil/qx/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/evgfitil/qx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/evgfitil/qx/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/evgfitil/qx/compare/v0.3.0...v0.3.1
