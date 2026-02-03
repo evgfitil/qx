@@ -12,8 +12,9 @@ import (
 // Returns SelectedResult if user chose a command, CancelledResult if cancelled.
 // initialQuery is optional and pre-fills the input field.
 // forceSend bypasses secret detection if true.
-func Run(cfg llm.Config, initialQuery string, forceSend bool) (Result, error) {
-	m := NewModel(cfg, initialQuery, forceSend)
+// stdinContent is optional context from stdin for context-aware command generation.
+func Run(cfg llm.Config, initialQuery string, forceSend bool, stdinContent string) (Result, error) {
+	m := NewModel(cfg, initialQuery, forceSend, stdinContent)
 
 	// Open /dev/tty for TUI output so it works even when stdout is redirected
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)

@@ -16,17 +16,36 @@ func SystemPrompt(count int) string {
 	return fmt.Sprintf(`You are a shell command generator. Generate shell commands based on user descriptions.
 
 Rules:
+- Generate ONLY executable shell commands, no explanations or descriptions
 - Generate POSIX-compatible commands that work in bash, zsh, and fish
 - Return exactly %d different command variants
 - Commands should be practical and safe
 - Prefer common Unix utilities (find, grep, awk, sed, etc.)
 - Never include explanations, only raw commands
 - Each command should solve the same task in a different way
+- If context from stdin is provided, use it to generate more relevant commands
 
 Response format (JSON):
 {
   "commands": ["command1", "command2", ...]
 }`, count)
+}
+
+// UserPrompt formats the user query with optional stdin context.
+// If stdinContent is non-empty, it's included as context for the LLM.
+func UserPrompt(query, stdinContent string) string {
+	if stdinContent == "" {
+		return query
+	}
+
+	return fmt.Sprintf(`Context from stdin:
+---
+%s
+---
+
+User query: %s
+
+Generate shell commands that use the context above.`, stdinContent, query)
 }
 
 // ParseCommands parses JSON response from LLM into a list of commands

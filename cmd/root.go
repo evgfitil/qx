@@ -89,7 +89,7 @@ func runInteractive(initialQuery string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
+	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend, stdinContent)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
@@ -138,7 +138,7 @@ func generateCommands(query string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
 	defer cancel()
 
-	commands, err := provider.Generate(ctx, query, cfg.LLM.Count)
+	commands, err := provider.Generate(ctx, query, cfg.LLM.Count, stdinContent)
 	if err != nil {
 		return fmt.Errorf("failed to generate commands: %w", err)
 	}

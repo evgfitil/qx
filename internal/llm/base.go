@@ -45,8 +45,9 @@ func categorizeAPIError(err error) error {
 	return err
 }
 
-// Generate creates shell commands based on user query
-func (p *baseProvider) Generate(ctx context.Context, query string, count int) ([]string, error) {
+// Generate creates shell commands based on user query.
+// stdinContent is optional context from stdin that helps generate more relevant commands.
+func (p *baseProvider) Generate(ctx context.Context, query string, count int, stdinContent string) ([]string, error) {
 	if query == "" {
 		return nil, fmt.Errorf("query cannot be empty")
 	}
@@ -60,7 +61,7 @@ func (p *baseProvider) Generate(ctx context.Context, query string, count int) ([
 			},
 			{
 				Role:    openai.ChatMessageRoleUser,
-				Content: query,
+				Content: UserPrompt(query, stdinContent),
 			},
 		},
 		ResponseFormat: &openai.ChatCompletionResponseFormat{

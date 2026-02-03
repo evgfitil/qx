@@ -17,7 +17,7 @@ func TestModel_Result_CancelledOnEsc(t *testing.T) {
 	}
 	initialQuery := "list files"
 
-	m := NewModel(cfg, initialQuery, false)
+	m := NewModel(cfg, initialQuery, false, "")
 
 	// Simulate Esc press
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -41,7 +41,7 @@ func TestModel_Result_SelectedOnEnter(t *testing.T) {
 		Count:   3,
 	}
 
-	m := NewModel(cfg, "", false)
+	m := NewModel(cfg, "", false, "")
 
 	// Simulate receiving commands from LLM
 	m.commands = []string{"ls -la", "ls -lah", "ls -l"}
@@ -72,7 +72,7 @@ func TestModel_Result_CancelledWithCtrlC(t *testing.T) {
 	}
 	initialQuery := "show processes"
 
-	m := NewModel(cfg, initialQuery, false)
+	m := NewModel(cfg, initialQuery, false, "")
 
 	// Simulate Ctrl+C press
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
@@ -96,7 +96,7 @@ func TestModel_Result_NoActionYet(t *testing.T) {
 		Count:   3,
 	}
 
-	m := NewModel(cfg, "test query", false)
+	m := NewModel(cfg, "test query", false, "")
 
 	// No user action yet - model in initial state
 	result := m.Result()
@@ -117,7 +117,7 @@ func TestModel_Result_EmptyQueryOnEsc(t *testing.T) {
 	}
 
 	// Start with empty query
-	m := NewModel(cfg, "", false)
+	m := NewModel(cfg, "", false, "")
 
 	// Simulate Esc press
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -142,7 +142,7 @@ func TestModel_Result_ModifiedQueryOnEsc(t *testing.T) {
 	}
 
 	initialQuery := "list files"
-	m := NewModel(cfg, initialQuery, false)
+	m := NewModel(cfg, initialQuery, false, "")
 
 	// Simulate typing additional text - send individual key messages
 	for _, r := range " with details" {
@@ -181,7 +181,7 @@ func TestModel_Result_CancelledFromSelectState(t *testing.T) {
 	}
 
 	originalQuery := "list files"
-	m := NewModel(cfg, originalQuery, false)
+	m := NewModel(cfg, originalQuery, false, "")
 
 	// Simulate the flow: user enters query, presses Enter, receives commands
 	m.originalQuery = originalQuery
@@ -215,7 +215,7 @@ func TestModel_Result_CancelledFromLoadingState(t *testing.T) {
 	}
 
 	originalQuery := "list files"
-	m := NewModel(cfg, originalQuery, false)
+	m := NewModel(cfg, originalQuery, false, "")
 
 	// Simulate the flow: user enters query and presses Enter, now in loading state
 	m.state = stateLoading

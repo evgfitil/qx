@@ -35,6 +35,88 @@ func TestSystemPrompt(t *testing.T) {
 	}
 }
 
+func TestSystemPromptContainsStdinInstruction(t *testing.T) {
+	got := SystemPrompt(3)
+
+	if !contains(got, "stdin") {
+		t.Error("SystemPrompt should mention stdin context")
+	}
+	if !contains(got, "ONLY executable shell commands") {
+		t.Error("SystemPrompt should contain instruction about generating only executable commands")
+	}
+}
+
+func TestUserPrompt(t *testing.T) {
+	tests := []struct {
+		name         string
+		query        string
+		stdinContent string
+		wantQuery    bool
+		wantContext  bool
+	}{
+		{
+			name:         "query without stdin",
+			query:        "list all files",
+			stdinContent: "",
+			wantQuery:    true,
+			wantContext:  false,
+		},
+		{
+			name:         "query with stdin context",
+			query:        "stop the nginx container",
+			stdinContent: "CONTAINER ID   IMAGE   STATUS\nabc123   nginx   Up 5 hours",
+			wantQuery:    true,
+			wantContext:  true,
+		},
+		{
+			name:         "stdin with multiline content",
+			query:        "filter errors",
+			stdinContent: "line1\nline2\nline3",
+			wantQuery:    true,
+			wantContext:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := UserPrompt(tt.query, tt.stdinContent)
+			if got == "" {
+				t.Error("UserPrompt returned empty string")
+			}
+			if tt.wantQuery && !contains(got, tt.query) {
+				t.Errorf("UserPrompt does not contain query: %q", tt.query)
+			}
+			if tt.wantContext && !contains(got, "Context from stdin") {
+				t.Error("UserPrompt does not contain stdin context header")
+			}
+			if tt.wantContext && !contains(got, tt.stdinContent) {
+				t.Errorf("UserPrompt does not contain stdin content: %q", tt.stdinContent)
+			}
+			if !tt.wantContext && contains(got, "Context from stdin") {
+				t.Error("UserPrompt contains stdin context header when it shouldn't")
+			}
+		})
+	}
+}
+
+func TestUserPromptFormat(t *testing.T) {
+	query := "use this data"
+	stdinContent := "data here"
+
+	got := UserPrompt(query, stdinContent)
+
+	// Verify the format structure
+	if !contains(got, "---") {
+		t.Error("UserPrompt missing delimiter markers")
+	}
+	if !contains(got, "User query:") {
+		t.Error("UserPrompt missing 'User query:' label")
+	}
+	if !contains(got, "Generate shell commands") {
+		t.Error("UserPrompt missing generation instruction")
+	}
+}
+
 func TestParseCommands(t *testing.T) {
 	tests := []struct {
 		name    string
