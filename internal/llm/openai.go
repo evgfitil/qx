@@ -4,7 +4,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-// OpenAIProvider implements Provider interface for standard OpenAI-compatible APIs.
+// OpenAIProvider is an LLM provider for standard OpenAI-compatible APIs.
 type OpenAIProvider struct {
 	baseProvider
 }

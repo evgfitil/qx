@@ -35,11 +35,6 @@ func TestNewProvider(t *testing.T) {
 
 			if provider == nil {
 				t.Error("NewProvider() returned nil provider")
-				return
-			}
-
-			if _, ok := provider.(*OpenAIProvider); !ok {
-				t.Errorf("NewProvider() returned %T, want *OpenAIProvider", provider)
 			}
 		})
 	}

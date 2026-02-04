@@ -16,6 +16,12 @@ import (
 	"github.com/evgfitil/qx/internal/tui"
 )
 
+// LLMProvider generates shell commands and describes existing ones.
+type LLMProvider interface {
+	Generate(ctx context.Context, query string, count int, stdinContent string) ([]string, error)
+	Describe(ctx context.Context, command string) (string, error)
+}
+
 const ExitCodeCancelled = 130
 
 var (

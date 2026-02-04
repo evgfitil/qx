@@ -15,6 +15,11 @@ import (
 	"github.com/evgfitil/qx/internal/llm"
 )
 
+// CommandGenerator generates shell commands from natural language queries.
+type CommandGenerator interface {
+	Generate(ctx context.Context, query string, count int, stdinContent string) ([]string, error)
+}
+
 type state int
 
 const (

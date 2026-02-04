@@ -1,8 +1,6 @@
 package llm
 
-import "context"
-
-// Config contains configuration for LLM provider
+// Config contains configuration for LLM provider.
 type Config struct {
 	BaseURL  string
 	APIKey   string
@@ -11,13 +9,7 @@ type Config struct {
 	Count    int // number of command variants to generate
 }
 
-// Provider generates shell commands using LLM
-type Provider interface {
-	Generate(ctx context.Context, query string, count int, stdinContent string) ([]string, error)
-	Describe(ctx context.Context, command string) (string, error)
-}
-
-// NewProvider creates appropriate provider based on configuration
-func NewProvider(cfg Config) (Provider, error) {
+// NewProvider creates a new LLM provider with the given configuration.
+func NewProvider(cfg Config) (*OpenAIProvider, error) {
 	return newOpenAIProvider(cfg)
 }
