@@ -53,7 +53,7 @@ func TestScriptContent(t *testing.T) {
 		shell         string
 		expectedParts []string
 	}{
-		{"bash", []string{"READLINE_LINE", "bind -x", "QX_PATH", "--query"}},
+		{"bash", []string{"READLINE_LINE", "bind -x", "QX_PATH", "--query", "mktemp", "err_file", "cat \"$err_file\" >/dev/tty", "rm -f \"$err_file\""}},
 		{"zsh", []string{"LBUFFER", "bindkey", "QX_PATH", "--query"}},
 		{"fish", []string{"__qx_widget", "commandline -r", "\\cg", "QX_PATH", "--query", "string collect", "pipestatus"}},
 	}
