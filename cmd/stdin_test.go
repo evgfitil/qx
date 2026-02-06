@@ -15,8 +15,8 @@ func TestReadFromReader_PipedInput(t *testing.T) {
 
 	content := "total 24\ndrwxr-xr-x  5 user staff  160 Jan  1 12:00 dir1\n-rw-r--r--  1 user staff 1024 Jan  1 12:00 file.txt"
 	go func() {
-		w.WriteString(content)
-		w.Close()
+		_, _ = w.WriteString(content)
+		_ = w.Close()
 	}()
 
 	got, err := readFromReader(r)
@@ -36,7 +36,7 @@ func TestReadFromReader_PipedEmptyInput(t *testing.T) {
 	}
 
 	go func() {
-		w.Close()
+		_ = w.Close()
 	}()
 
 	got, err := readFromReader(r)
@@ -56,8 +56,8 @@ func TestReadFromReader_PipedWhitespaceOnly(t *testing.T) {
 	}
 
 	go func() {
-		w.WriteString("  \n\t\n  ")
-		w.Close()
+		_, _ = w.WriteString("  \n\t\n  ")
+		_ = w.Close()
 	}()
 
 	got, err := readFromReader(r)
@@ -75,7 +75,7 @@ func TestReadFromReader_TTYInput(t *testing.T) {
 	if err != nil {
 		t.Skip("cannot open /dev/tty (no TTY available)")
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	got, err := readFromReader(f)
 	if err != nil {
@@ -95,8 +95,8 @@ func TestReadFromReader_OversizedInput(t *testing.T) {
 
 	go func() {
 		data := strings.Repeat("x", maxStdinSize+1)
-		w.WriteString(data)
-		w.Close()
+		_, _ = w.WriteString(data)
+		_ = w.Close()
 	}()
 
 	_, err = readFromReader(r)
@@ -113,8 +113,8 @@ func TestReadFromReader_ExactLimitInput(t *testing.T) {
 
 	data := strings.Repeat("x", maxStdinSize)
 	go func() {
-		w.WriteString(data)
-		w.Close()
+		_, _ = w.WriteString(data)
+		_ = w.Close()
 	}()
 
 	got, err := readFromReader(r)
