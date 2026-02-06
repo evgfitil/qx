@@ -35,24 +35,24 @@ func ShouldPrompt() bool {
 // bytes so they don't leak into the parent shell.
 func readKeypress(r io.Reader) (Action, error) {
 	buf := make([]byte, 1)
-	if _, err := r.Read(buf); err != nil {
-		return ActionQuit, fmt.Errorf("failed to read keypress: %w", err)
-	}
+	for {
+		if _, err := r.Read(buf); err != nil {
+			return ActionQuit, fmt.Errorf("failed to read keypress: %w", err)
+		}
 
-	switch buf[0] {
-	case 'e', 'E':
-		return ActionExecute, nil
-	case 'c', 'C':
-		return ActionCopy, nil
-	case 'q', 'Q', '\r', '\n':
-		return ActionQuit, nil
-	case 0x03: // Ctrl+C
-		return ActionCancel, nil
-	case 0x1b: // Escape (may be start of multi-byte sequence)
-		drainEscapeSequence(r)
-		return ActionCancel, nil
-	default:
-		return readKeypress(r)
+		switch buf[0] {
+		case 'e', 'E':
+			return ActionExecute, nil
+		case 'c', 'C':
+			return ActionCopy, nil
+		case 'q', 'Q', '\r', '\n':
+			return ActionQuit, nil
+		case 0x03: // Ctrl+C
+			return ActionCancel, nil
+		case 0x1b: // Escape (may be start of multi-byte sequence)
+			drainEscapeSequence(r)
+			return ActionCancel, nil
+		}
 	}
 }
 
@@ -127,10 +127,12 @@ func dispatchAction(act Action, command string) error {
 		}
 		fmt.Fprintln(os.Stderr, "Copied to clipboard.")
 		return nil
+	case ActionQuit:
+		fmt.Println(command)
+		return nil
 	case ActionCancel:
 		return ErrCancelled
 	default:
-		fmt.Println(command)
-		return nil
+		return fmt.Errorf("unknown action: %d", act)
 	}
 }

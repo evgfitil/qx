@@ -24,7 +24,7 @@ func Run(cfg llm.Config, initialQuery string, forceSend bool, pipeContext string
 		defer tty.Close() //nolint:errcheck
 	}
 
-	p := tea.NewProgram(m, tea.WithOutput(tty))
+	p := tea.NewProgram(m, tea.WithOutput(tty), tea.WithInputTTY())
 
 	result, err := p.Run()
 	if err != nil {
