@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/evgfitil/qx/internal/guard"
@@ -82,5 +83,62 @@ func TestGenerateCommands_PipeContextSecretsForceSendBypass(t *testing.T) {
 	}
 	if err == nil {
 		t.Fatal("expected error from config.Load() in test environment")
+	}
+}
+
+func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
+	// When stdout is a pipe (non-TTY), handleSelectedCommand should print
+	// the command to stdout without showing the action menu.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	handleErr := handleSelectedCommand("echo hello")
+	_ = w.Close()
+
+	if handleErr != nil {
+		t.Errorf("handleSelectedCommand returned error: %v", handleErr)
+	}
+
+	buf := make([]byte, 256)
+	n, _ := r.Read(buf)
+	_ = r.Close()
+
+	got := string(buf[:n])
+	if got != "echo hello\n" {
+		t.Errorf("handleSelectedCommand output = %q, want %q", got, "echo hello\n")
+	}
+}
+
+func TestHandleSelectedCommand_NonTTY_EmptyCommand(t *testing.T) {
+	// Even with empty command, non-TTY path should print and return nil.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	handleErr := handleSelectedCommand("")
+	_ = w.Close()
+
+	if handleErr != nil {
+		t.Errorf("handleSelectedCommand returned error: %v", handleErr)
+	}
+
+	buf := make([]byte, 256)
+	n, _ := r.Read(buf)
+	_ = r.Close()
+
+	got := string(buf[:n])
+	if got != "\n" {
+		t.Errorf("handleSelectedCommand output = %q, want %q", got, "\n")
 	}
 }

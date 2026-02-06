@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/evgfitil/qx/internal/action"
 	"github.com/evgfitil/qx/internal/config"
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
@@ -104,7 +105,7 @@ func runInteractive(initialQuery string, pipeContext string) error {
 		return ErrCancelled
 	case tui.SelectedResult:
 		if r.Command != "" {
-			fmt.Println(r.Command)
+			return handleSelectedCommand(r.Command)
 		}
 		return nil
 	default:
@@ -168,8 +169,18 @@ func generateCommands(query string, pipeContext string) error {
 	}
 
 	if selected != "" {
-		fmt.Println(selected)
+		return handleSelectedCommand(selected)
 	}
 
+	return nil
+}
+
+// handleSelectedCommand either shows the post-selection action menu (when
+// stdout is a TTY) or prints the command to stdout (when redirected).
+func handleSelectedCommand(command string) error {
+	if action.ShouldPrompt() {
+		return action.PromptAction(command)
+	}
+	fmt.Println(command)
 	return nil
 }
