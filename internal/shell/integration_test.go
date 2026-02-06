@@ -55,7 +55,7 @@ func TestScriptContent(t *testing.T) {
 	}{
 		{"bash", []string{"READLINE_LINE", "bind -x", "QX_PATH", "--query"}},
 		{"zsh", []string{"LBUFFER", "bindkey", "QX_PATH", "--query"}},
-		{"fish", []string{"__qx_widget", "commandline -r", "\\cg", "QX_PATH", "--query"}},
+		{"fish", []string{"__qx_widget", "commandline -r", "\\cg", "QX_PATH", "--query", "string collect", "pipestatus"}},
 	}
 
 	for _, tt := range tests {
