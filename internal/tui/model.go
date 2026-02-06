@@ -168,12 +168,6 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 			m.err = err
 			return m, nil
 		}
-		if m.pipeContext != "" {
-			if err := guard.CheckQuery(m.pipeContext, m.forceSend); err != nil {
-				m.err = err
-				return m, nil
-			}
-		}
 
 		m.state = stateLoading
 		m.originalQuery = query

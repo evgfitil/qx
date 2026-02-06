@@ -1,6 +1,7 @@
 package action
 
 import (
+	"io"
 	"os"
 	"testing"
 )
@@ -85,11 +86,10 @@ func TestExecute_EchoCommand(t *testing.T) {
 		t.Fatalf("Execute(\"echo hello\") returned error: %v", execErr)
 	}
 
-	buf := make([]byte, 64)
-	n, _ := r.Read(buf)
-	got := string(buf[:n])
-	if got != "hello\n" {
-		t.Errorf("Execute(\"echo hello\") output = %q, want %q", got, "hello\n")
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if string(out) != "hello\n" {
+		t.Errorf("Execute(\"echo hello\") output = %q, want %q", string(out), "hello\n")
 	}
 }
 

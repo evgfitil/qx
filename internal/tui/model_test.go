@@ -2,7 +2,6 @@ package tui
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +11,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/sashabaranov/go-openai"
 
-	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
 )
 
@@ -23,7 +21,8 @@ func newMockLLMServer(t *testing.T, capturedBody *string, responseJSON string) *
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			t.Fatalf("failed to read request body: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		*capturedBody = string(body)
 
@@ -364,33 +363,6 @@ func TestGenerateCommands_WithoutPipeContext(t *testing.T) {
 
 	if strings.Contains(capturedBody, "Task:") {
 		t.Error("request should not contain 'Task:' prefix when no pipe context")
-	}
-}
-
-func TestHandleEnter_PipeContextSecretDetection(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-	secretPipeCtx := "export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"
-
-	m := NewModel(cfg, "use this key", false, secretPipeCtx)
-
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model := updated.(Model)
-
-	if model.err == nil {
-		t.Fatal("expected error for secret in pipe context")
-	}
-
-	var secretsErr *guard.SecretsError
-	if !errors.As(model.err, &secretsErr) {
-		t.Errorf("expected SecretsError, got %T: %v", model.err, model.err)
-	}
-	if model.state != stateInput {
-		t.Errorf("expected state to remain stateInput, got %d", model.state)
 	}
 }
 

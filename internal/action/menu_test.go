@@ -2,6 +2,8 @@ package action
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"testing"
 )
@@ -117,11 +119,10 @@ func TestDispatchAction_Quit(t *testing.T) {
 		t.Errorf("dispatchAction(ActionQuit) returned error: %v", dispatchErr)
 	}
 
-	buf := make([]byte, 128)
-	n, _ := r.Read(buf)
-	got := string(buf[:n])
-	if got != "echo hello\n" {
-		t.Errorf("dispatchAction(ActionQuit) output = %q, want %q", got, "echo hello\n")
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if string(out) != "echo hello\n" {
+		t.Errorf("dispatchAction(ActionQuit) output = %q, want %q", string(out), "echo hello\n")
 	}
 }
 
@@ -138,7 +139,11 @@ func TestPromptActionWith_Quit(t *testing.T) {
 
 	// Redirect stderr to discard prompt output
 	origStderr := os.Stderr
-	_, stderrW, _ := os.Pipe()
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+	defer func() { _ = stderrR.Close() }()
 	os.Stderr = stderrW
 	t.Cleanup(func() { os.Stderr = origStderr })
 
@@ -151,11 +156,10 @@ func TestPromptActionWith_Quit(t *testing.T) {
 		t.Errorf("promptActionWith(\"echo hello\", 'q') returned error: %v", promptErr)
 	}
 
-	buf := make([]byte, 128)
-	n, _ := r.Read(buf)
-	got := string(buf[:n])
-	if got != "echo hello\n" {
-		t.Errorf("promptActionWith quit output = %q, want %q", got, "echo hello\n")
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if string(out) != "echo hello\n" {
+		t.Errorf("promptActionWith quit output = %q, want %q", string(out), "echo hello\n")
 	}
 }
 
@@ -164,15 +168,52 @@ func TestPromptActionWith_Execute(t *testing.T) {
 
 	// Redirect stderr to discard prompt output
 	origStderr := os.Stderr
-	_, stderrW, _ := os.Pipe()
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+	defer func() { _ = stderrR.Close() }()
 	os.Stderr = stderrW
 	t.Cleanup(func() { os.Stderr = origStderr })
 
 	input := bytes.NewReader([]byte{'e'})
-	err := promptActionWith("true", input)
+	promptErr := promptActionWith("true", input)
 	_ = stderrW.Close()
 
+	if promptErr != nil {
+		t.Errorf("promptActionWith(\"true\", 'e') returned error: %v", promptErr)
+	}
+}
+
+func TestReadKeypress_Cancel(t *testing.T) {
+	for _, key := range []byte{0x03, 0x1b} {
+		r := bytes.NewReader([]byte{key})
+		act, err := readKeypress(r)
+		if err != nil {
+			t.Errorf("readKeypress(0x%02x) returned error: %v", key, err)
+		}
+		if act != ActionCancel {
+			t.Errorf("readKeypress(0x%02x) = %d, want ActionCancel(%d)", key, act, ActionCancel)
+		}
+	}
+}
+
+func TestReadKeypress_EscapeSequence(t *testing.T) {
+	// Arrow key sends \x1b[A (3 bytes). readKeypress should return ActionCancel
+	// and drain the trailing bytes.
+	r := bytes.NewReader([]byte{0x1b, '[', 'A'})
+	act, err := readKeypress(r)
 	if err != nil {
-		t.Errorf("promptActionWith(\"true\", 'e') returned error: %v", err)
+		t.Fatalf("readKeypress(escape sequence) returned error: %v", err)
+	}
+	if act != ActionCancel {
+		t.Errorf("readKeypress(escape sequence) = %d, want ActionCancel(%d)", act, ActionCancel)
+	}
+}
+
+func TestDispatchAction_Cancel(t *testing.T) {
+	err := dispatchAction(ActionCancel, "echo hello")
+	if !errors.Is(err, ErrCancelled) {
+		t.Errorf("dispatchAction(ActionCancel) = %v, want ErrCancelled", err)
 	}
 }

@@ -74,6 +74,12 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if pipeContext != "" {
+		if err := guard.CheckQuery(pipeContext, forceSend); err != nil {
+			return err
+		}
+	}
+
 	if len(args) == 0 {
 		return runInteractive(queryFlag, pipeContext)
 	}
@@ -129,11 +135,6 @@ func generateCommands(query string, pipeContext string) error {
 	if err := guard.CheckQuery(query, forceSend); err != nil {
 		return err
 	}
-	if pipeContext != "" {
-		if err := guard.CheckQuery(pipeContext, forceSend); err != nil {
-			return err
-		}
-	}
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -181,7 +182,11 @@ func generateCommands(query string, pipeContext string) error {
 // stdout is a TTY) or prints the command to stdout (when redirected).
 func handleSelectedCommand(command string) error {
 	if action.ShouldPrompt() {
-		return action.PromptAction(command)
+		err := action.PromptAction(command)
+		if errors.Is(err, action.ErrCancelled) {
+			return ErrCancelled
+		}
+		return err
 	}
 	fmt.Println(command)
 	return nil

@@ -16,7 +16,8 @@ func TestGenerate_WithPipeContext(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&capturedRequest); err != nil {
-			t.Fatalf("failed to decode request: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 
 		resp := openai.ChatCompletionResponse{
@@ -68,7 +69,8 @@ func TestGenerate_WithoutPipeContext(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&capturedRequest); err != nil {
-			t.Fatalf("failed to decode request: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 
 		resp := openai.ChatCompletionResponse{

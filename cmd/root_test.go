@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 
@@ -14,23 +15,6 @@ func TestErrCancelled_CanBeExtracted(t *testing.T) {
 
 	if !errors.Is(wrapped, ErrCancelled) {
 		t.Fatal("expected errors.Is to find ErrCancelled in wrapped error")
-	}
-}
-
-func TestGenerateCommands_PipeContextWithSecrets(t *testing.T) {
-	origForceSend := forceSend
-	defer func() { forceSend = origForceSend }()
-	forceSend = false
-
-	pipeContext := "export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"
-	err := generateCommands("list files", pipeContext)
-	if err == nil {
-		t.Fatal("expected error for pipe context with secrets")
-	}
-
-	var secretsErr *guard.SecretsError
-	if !errors.As(err, &secretsErr) {
-		t.Fatalf("expected SecretsError, got %T: %v", err, err)
 	}
 }
 
@@ -68,24 +52,6 @@ func TestGenerateCommands_EmptyPipeContextSkipsGuard(t *testing.T) {
 	}
 }
 
-func TestGenerateCommands_PipeContextSecretsForceSendBypass(t *testing.T) {
-	origForceSend := forceSend
-	defer func() { forceSend = origForceSend }()
-	forceSend = true
-
-	// With forceSend=true, secrets in pipe context should be bypassed.
-	// Should pass guard check and fail later at config.Load().
-	err := generateCommands("list files", "export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE")
-
-	var secretsErr *guard.SecretsError
-	if errors.As(err, &secretsErr) {
-		t.Fatal("forceSend=true should bypass secrets detection in pipe context")
-	}
-	if err == nil {
-		t.Fatal("expected error from config.Load() in test environment")
-	}
-}
-
 func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 	// When stdout is a pipe (non-TTY), handleSelectedCommand should print
 	// the command to stdout without showing the action menu.
@@ -105,13 +71,11 @@ func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 		t.Errorf("handleSelectedCommand returned error: %v", handleErr)
 	}
 
-	buf := make([]byte, 256)
-	n, _ := r.Read(buf)
+	out, _ := io.ReadAll(r)
 	_ = r.Close()
 
-	got := string(buf[:n])
-	if got != "echo hello\n" {
-		t.Errorf("handleSelectedCommand output = %q, want %q", got, "echo hello\n")
+	if string(out) != "echo hello\n" {
+		t.Errorf("handleSelectedCommand output = %q, want %q", string(out), "echo hello\n")
 	}
 }
 
@@ -133,12 +97,10 @@ func TestHandleSelectedCommand_NonTTY_EmptyCommand(t *testing.T) {
 		t.Errorf("handleSelectedCommand returned error: %v", handleErr)
 	}
 
-	buf := make([]byte, 256)
-	n, _ := r.Read(buf)
+	out, _ := io.ReadAll(r)
 	_ = r.Close()
 
-	got := string(buf[:n])
-	if got != "\n" {
-		t.Errorf("handleSelectedCommand output = %q, want %q", got, "\n")
+	if string(out) != "\n" {
+		t.Errorf("handleSelectedCommand output = %q, want %q", string(out), "\n")
 	}
 }

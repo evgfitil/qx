@@ -1,13 +1,18 @@
 package action
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/mattn/go-isatty"
 	"golang.org/x/term"
 )
+
+// ErrCancelled indicates the user cancelled without choosing an action.
+var ErrCancelled = errors.New("action cancelled")
 
 // Action represents a post-selection action chosen by the user.
 type Action int
@@ -16,6 +21,7 @@ const (
 	ActionExecute Action = iota
 	ActionCopy
 	ActionQuit
+	ActionCancel
 )
 
 // ShouldPrompt returns true if stdout is a TTY, meaning the user is
@@ -25,7 +31,8 @@ func ShouldPrompt() bool {
 }
 
 // readKeypress reads a single keypress from the given reader, which should
-// be in raw mode. Extracted for testability.
+// be in raw mode. Handles multi-byte escape sequences by draining trailing
+// bytes so they don't leak into the parent shell.
 func readKeypress(r io.Reader) (Action, error) {
 	buf := make([]byte, 1)
 	if _, err := r.Read(buf); err != nil {
@@ -39,9 +46,27 @@ func readKeypress(r io.Reader) (Action, error) {
 		return ActionCopy, nil
 	case 'q', 'Q', '\r', '\n':
 		return ActionQuit, nil
+	case 0x03, 0x1b: // Ctrl+C, Escape
+		drainEscapeSequence(r)
+		return ActionCancel, nil
 	default:
 		return ActionQuit, nil
 	}
+}
+
+// drainEscapeSequence reads and discards trailing bytes of a multi-byte
+// escape sequence (e.g. arrow keys send \x1b[A — 3 bytes). Uses a short
+// deadline when the reader supports it, otherwise reads non-blockingly.
+func drainEscapeSequence(r io.Reader) {
+	type deadliner interface {
+		SetReadDeadline(t time.Time) error
+	}
+	if d, ok := r.(deadliner); ok {
+		_ = d.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
+		defer func() { _ = d.SetReadDeadline(time.Time{}) }()
+	}
+	discard := make([]byte, 8)
+	_, _ = r.Read(discard)
 }
 
 // PromptAction displays the selected command and an action menu,
@@ -100,6 +125,8 @@ func dispatchAction(act Action, command string) error {
 		}
 		fmt.Fprintln(os.Stderr, "Copied to clipboard.")
 		return nil
+	case ActionCancel:
+		return ErrCancelled
 	default:
 		fmt.Println(command)
 		return nil
