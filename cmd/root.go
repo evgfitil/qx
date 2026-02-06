@@ -32,7 +32,11 @@ var rootCmd = &cobra.Command{
 	Use:   "qx [query]",
 	Short: "Generate shell commands using LLM",
 	Long: `qx is a CLI tool that generates shell commands from natural language descriptions.
-It uses LLM to generate multiple command variants and presents them in a fzf-style picker.`,
+It uses LLM to generate multiple command variants and presents them in a fzf-style picker.
+
+Pipe command output into qx to provide context for more precise command generation:
+  ls -la | qx "delete files larger than 1GB"
+  docker ps | qx "stop all nginx containers"`,
 	Version:       Version,
 	Args:          cobra.MaximumNArgs(1),
 	RunE:          run,

@@ -108,6 +108,25 @@ qx --query "git log"
 # TUI opens with input field pre-filled
 ```
 
+### Pipe mode
+
+Pipe command output into qx to provide context for more precise generation:
+
+```bash
+ls -la | qx "delete files larger than 1GB"
+docker ps | qx "stop all nginx containers"
+git branch | qx "delete all merged branches"
+```
+
+Pipe mode also works with interactive TUI:
+
+```bash
+kubectl get pods | qx
+# Type your query in the TUI with pod list as context
+```
+
+Stdin input is limited to 64KB. Content is checked for secrets before being sent to the LLM.
+
 ## License
 
 MIT
