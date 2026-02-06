@@ -5,6 +5,7 @@ function __qx_widget
     end
     set -l current_buffer (commandline)
     set -l err_file (mktemp)
+    or begin; $qx_cmd --query "$current_buffer" 2>/dev/tty </dev/tty; return; end
     set -l result ($qx_cmd --query "$current_buffer" 2>$err_file </dev/tty | string collect)
     set -l exit_code $pipestatus[1]
     if test \( $exit_code -eq 0 -o $exit_code -eq 130 \) -a -n "$result"

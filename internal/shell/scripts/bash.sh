@@ -1,7 +1,7 @@
 __qx_widget() {
     local qx_cmd="${QX_PATH:-qx}"
     local result err_file
-    err_file=$(mktemp)
+    err_file=$(mktemp) || { "$qx_cmd" --query "$READLINE_LINE" </dev/tty 2>/dev/tty; return; }
     result=$("$qx_cmd" --query "$READLINE_LINE" </dev/tty 2>"$err_file")
     local exit_code=$?
     if [[ ($exit_code -eq 0 || $exit_code -eq 130) && -n "$result" ]]; then
