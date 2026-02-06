@@ -16,6 +16,8 @@ func TestScript(t *testing.T) {
 		{name: "fish returns script", shell: "fish"},
 		{name: "unsupported shell returns error", shell: "powershell", wantErr: true},
 		{name: "empty shell returns error", shell: "", wantErr: true},
+		{name: "case sensitive Fish", shell: "Fish", wantErr: true},
+		{name: "case sensitive BASH", shell: "BASH", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -24,6 +26,9 @@ func TestScript(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
+				}
+				if script != "" {
+					t.Errorf("expected empty script on error, got: %q", script)
 				}
 				if !strings.Contains(err.Error(), "unsupported shell") {
 					t.Errorf("error should mention 'unsupported shell', got: %s", err.Error())
@@ -43,44 +48,27 @@ func TestScript(t *testing.T) {
 	}
 }
 
-func TestScriptBashContent(t *testing.T) {
-	script, err := Script("bash")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestScriptContent(t *testing.T) {
+	tests := []struct {
+		shell         string
+		expectedParts []string
+	}{
+		{"bash", []string{"READLINE_LINE", "bind -x", "QX_PATH", "--query"}},
+		{"zsh", []string{"LBUFFER", "bindkey", "QX_PATH", "--query"}},
+		{"fish", []string{"__qx_widget", "commandline -r", "\\cg", "QX_PATH", "--query"}},
 	}
 
-	expectedParts := []string{"READLINE_LINE", `bind -x`}
-	for _, part := range expectedParts {
-		if !strings.Contains(script, part) {
-			t.Errorf("bash script should contain %q", part)
-		}
-	}
-}
-
-func TestScriptZshContent(t *testing.T) {
-	script, err := Script("zsh")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expectedParts := []string{"LBUFFER", "bindkey"}
-	for _, part := range expectedParts {
-		if !strings.Contains(script, part) {
-			t.Errorf("zsh script should contain %q", part)
-		}
-	}
-}
-
-func TestScriptFishContent(t *testing.T) {
-	script, err := Script("fish")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expectedParts := []string{"bind", "commandline", "function", "end"}
-	for _, part := range expectedParts {
-		if !strings.Contains(script, part) {
-			t.Errorf("fish script should contain %q", part)
-		}
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			script, err := Script(tt.shell)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, part := range tt.expectedParts {
+				if !strings.Contains(script, part) {
+					t.Errorf("%s script should contain %q", tt.shell, part)
+				}
+			}
+		})
 	}
 }
