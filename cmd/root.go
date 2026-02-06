@@ -76,6 +76,9 @@ func runInteractive(initialQuery string) error {
 		if _, showErr := tui.ShowError(err, initialQuery); showErr != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
+		if initialQuery != "" {
+			fmt.Println(initialQuery)
+		}
 		return ErrCancelled
 	}
 
