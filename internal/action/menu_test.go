@@ -65,14 +65,24 @@ func TestReadKeypress_Quit(t *testing.T) {
 	}
 }
 
-func TestReadKeypress_UnknownKey(t *testing.T) {
-	r := bytes.NewReader([]byte{'x'})
+func TestReadKeypress_UnknownKeyRetries(t *testing.T) {
+	// Unknown key 'x' is ignored; readKeypress retries and reads 'q'.
+	r := bytes.NewReader([]byte{'x', 'q'})
 	act, err := readKeypress(r)
 	if err != nil {
-		t.Errorf("readKeypress('x') returned error: %v", err)
+		t.Errorf("readKeypress('x','q') returned error: %v", err)
 	}
 	if act != ActionQuit {
-		t.Errorf("readKeypress('x') = %d, want ActionQuit(%d)", act, ActionQuit)
+		t.Errorf("readKeypress('x','q') = %d, want ActionQuit(%d)", act, ActionQuit)
+	}
+}
+
+func TestReadKeypress_UnknownKeyOnlyReturnsError(t *testing.T) {
+	// When only unknown keys are available, readKeypress eventually hits EOF.
+	r := bytes.NewReader([]byte{'x'})
+	_, err := readKeypress(r)
+	if err == nil {
+		t.Error("readKeypress('x' only) expected error on retry EOF, got nil")
 	}
 }
 

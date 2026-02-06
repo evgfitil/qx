@@ -46,11 +46,13 @@ func readKeypress(r io.Reader) (Action, error) {
 		return ActionCopy, nil
 	case 'q', 'Q', '\r', '\n':
 		return ActionQuit, nil
-	case 0x03, 0x1b: // Ctrl+C, Escape
+	case 0x03: // Ctrl+C
+		return ActionCancel, nil
+	case 0x1b: // Escape (may be start of multi-byte sequence)
 		drainEscapeSequence(r)
 		return ActionCancel, nil
 	default:
-		return ActionQuit, nil
+		return readKeypress(r)
 	}
 }
 
