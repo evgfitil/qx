@@ -13,6 +13,7 @@ Generate shell commands from natural language using LLM.
 - Natural language to shell command conversion
 - Multiple command variants with fuzzy selection
 - Interactive TUI with real-time filtering
+- Post-selection actions: execute, copy to clipboard, or print to stdout
 - Pipe command output as context for precise command generation
 - Shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support
 - Support for OpenAI-compatible APIs
@@ -127,6 +128,23 @@ kubectl get pods | qx
 ```
 
 Stdin input is limited to 64KB. Content is checked for secrets before being sent to the LLM.
+
+### Post-selection actions
+
+After selecting a command (in any mode), an action menu appears:
+
+```text
+  docker stop $(docker ps -q --filter ancestor=nginx)
+
+  [e]xecute  [c]opy  [q]uit
+```
+
+- `e` - execute the command in a subprocess
+- `c` - copy to clipboard
+- `q` or Enter - print to stdout
+
+The menu only appears when running in a terminal. When stdout is redirected
+(e.g., via shell integration Ctrl+G), the command is printed to stdout directly.
 
 ## License
 
