@@ -62,15 +62,20 @@ func run(cmd *cobra.Command, args []string) error {
 		return handleShellIntegration(shellIntegration)
 	}
 
+	pipeContext, err := readStdin()
+	if err != nil {
+		return err
+	}
+
 	if len(args) == 0 {
-		return runInteractive(queryFlag)
+		return runInteractive(queryFlag, pipeContext)
 	}
 
 	query := args[0]
-	return generateCommands(query)
+	return generateCommands(query, pipeContext)
 }
 
-func runInteractive(initialQuery string) error {
+func runInteractive(initialQuery string, pipeContext string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		if _, showErr := tui.ShowError(err, initialQuery); showErr != nil {
@@ -113,9 +118,14 @@ func handleShellIntegration(shellName string) error {
 }
 
 // generateCommands generates shell commands using LLM based on user query.
-func generateCommands(query string) error {
+func generateCommands(query string, pipeContext string) error {
 	if err := guard.CheckQuery(query, forceSend); err != nil {
 		return err
+	}
+	if pipeContext != "" {
+		if err := guard.CheckQuery(pipeContext, forceSend); err != nil {
+			return err
+		}
 	}
 
 	cfg, err := config.Load()
@@ -131,7 +141,7 @@ func generateCommands(query string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
 	defer cancel()
 
-	commands, err := provider.Generate(ctx, query, cfg.LLM.Count, "")
+	commands, err := provider.Generate(ctx, query, cfg.LLM.Count, pipeContext)
 	if err != nil {
 		return fmt.Errorf("failed to generate commands: %w", err)
 	}
