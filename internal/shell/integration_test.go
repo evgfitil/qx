@@ -53,9 +53,9 @@ func TestScriptContent(t *testing.T) {
 		shell         string
 		expectedParts []string
 	}{
-		{"bash", []string{"READLINE_LINE", "bind -x", "QX_PATH", "--query", "mktemp", "err_file", "2>\"$err_file\"", "cat \"$err_file\" >/dev/tty", "rm -f \"$err_file\""}},
-		{"zsh", []string{"LBUFFER", "bindkey", "QX_PATH", "--query", "mktemp", "err_file", "2>\"$err_file\"", "cat \"$err_file\" >/dev/tty", "rm -f \"$err_file\""}},
-		{"fish", []string{"__qx_widget", "commandline -r", "\\cg", "QX_PATH", "--query", "string collect", "pipestatus", "mktemp", "err_file", "2>$err_file", "cat $err_file >/dev/tty", "rm -f $err_file"}},
+		{"bash", []string{"READLINE_LINE", "bind -x", "QX_PATH", "--query", "mktemp", "err_file", "2>\"$err_file\"", "cat \"$err_file\" >/dev/tty", "rm -f \"$err_file\"", "$exit_code -ne 0 && $exit_code -ne 130"}},
+		{"zsh", []string{"LBUFFER", "bindkey", "QX_PATH", "--query", "mktemp", "err_file", "2>\"$err_file\"", "cat \"$err_file\" >/dev/tty", "rm -f \"$err_file\"", "$exit_code -ne 0 && $exit_code -ne 130", "zle -I"}},
+		{"fish", []string{"__qx_widget", "commandline -r", "\\cg", "QX_PATH", "--query", "string collect", "pipestatus", "mktemp", "err_file", "2>$err_file", "cat $err_file >/dev/tty", "rm -f $err_file", "$exit_code -ne 0 -a $exit_code -ne 130"}},
 	}
 
 	for _, tt := range tests {
