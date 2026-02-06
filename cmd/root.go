@@ -131,7 +131,7 @@ func generateCommands(query string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
 	defer cancel()
 
-	commands, err := provider.Generate(ctx, query, cfg.LLM.Count)
+	commands, err := provider.Generate(ctx, query, cfg.LLM.Count, "")
 	if err != nil {
 		return fmt.Errorf("failed to generate commands: %w", err)
 	}

@@ -12,7 +12,15 @@ type commandsResponse struct {
 
 // SystemPrompt generates the system prompt for command generation.
 // count specifies how many command variants should be generated.
-func SystemPrompt(count int) string {
+// hasPipeContext indicates whether stdin context is provided with the request.
+func SystemPrompt(count int, hasPipeContext bool) string {
+	pipeRules := ""
+	if hasPipeContext {
+		pipeRules = `
+- When stdin context is provided, use the concrete values from it to generate precise commands
+- Generate commands that reference actual data from the context (file names, container IDs, process IDs, etc.)`
+	}
+
 	return fmt.Sprintf(`You are a shell command generator. Generate shell commands based on user descriptions.
 
 Rules:
@@ -21,12 +29,12 @@ Rules:
 - Commands should be practical and safe
 - Prefer common Unix utilities (find, grep, awk, sed, etc.)
 - Never include explanations, only raw commands
-- Each command should solve the same task in a different way
+- Each command should solve the same task in a different way%s
 
 Response format (JSON):
 {
   "commands": ["command1", "command2", ...]
-}`, count)
+}`, count, pipeRules)
 }
 
 // ParseCommands parses JSON response from LLM into a list of commands

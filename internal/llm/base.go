@@ -45,10 +45,16 @@ func categorizeAPIError(err error) error {
 	return err
 }
 
-// Generate creates shell commands based on user query
-func (p *baseProvider) Generate(ctx context.Context, query string, count int) ([]string, error) {
+// Generate creates shell commands based on user query.
+// pipeContext contains optional stdin data piped into qx for additional context.
+func (p *baseProvider) Generate(ctx context.Context, query string, count int, pipeContext string) ([]string, error) {
 	if query == "" {
 		return nil, fmt.Errorf("query cannot be empty")
+	}
+
+	userMessage := query
+	if pipeContext != "" {
+		userMessage = fmt.Sprintf("Context:\n<stdin>\n%s\n</stdin>\n\nTask: %s", pipeContext, query)
 	}
 
 	req := openai.ChatCompletionRequest{
@@ -56,11 +62,11 @@ func (p *baseProvider) Generate(ctx context.Context, query string, count int) ([
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
-				Content: SystemPrompt(count),
+				Content: SystemPrompt(count, pipeContext != ""),
 			},
 			{
 				Role:    openai.ChatMessageRoleUser,
-				Content: query,
+				Content: userMessage,
 			},
 		},
 		ResponseFormat: &openai.ChatCompletionResponseFormat{

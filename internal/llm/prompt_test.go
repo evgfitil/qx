@@ -6,30 +6,45 @@ import (
 
 func TestSystemPrompt(t *testing.T) {
 	tests := []struct {
-		name  string
-		count int
-		want  string
+		name           string
+		count          int
+		hasPipeContext bool
+		want           string
+		wantAbsent     string
 	}{
 		{
-			name:  "single command",
-			count: 1,
-			want:  "exactly 1 different command variants",
+			name:           "single command without pipe context",
+			count:          1,
+			hasPipeContext: false,
+			want:           "exactly 1 different command variants",
+			wantAbsent:     "stdin context",
 		},
 		{
-			name:  "multiple commands",
-			count: 5,
-			want:  "exactly 5 different command variants",
+			name:           "multiple commands without pipe context",
+			count:          5,
+			hasPipeContext: false,
+			want:           "exactly 5 different command variants",
+			wantAbsent:     "stdin context",
+		},
+		{
+			name:           "with pipe context includes stdin instructions",
+			count:          3,
+			hasPipeContext: true,
+			want:           "stdin context is provided",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SystemPrompt(tt.count)
+			got := SystemPrompt(tt.count, tt.hasPipeContext)
 			if got == "" {
 				t.Error("SystemPrompt returned empty string")
 			}
 			if !contains(got, tt.want) {
 				t.Errorf("SystemPrompt does not contain expected text: %q", tt.want)
+			}
+			if tt.wantAbsent != "" && contains(got, tt.wantAbsent) {
+				t.Errorf("SystemPrompt should not contain: %q", tt.wantAbsent)
 			}
 		})
 	}
