@@ -84,6 +84,10 @@ input as initial query. Add instructions to modify or extend the command.
 **Prompt restoration**: Press Esc to cancel selection and restore your query
 to the command line for editing.
 
+**Error display**: If qx encounters an error (invalid configuration, API failure, etc.),
+the error message is displayed in the terminal. Normal cancellation via Esc does not
+produce error output.
+
 ### Direct mode
 
 ```bash
