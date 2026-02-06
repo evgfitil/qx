@@ -55,7 +55,7 @@ func TestScriptContent(t *testing.T) {
 	}{
 		{"bash", []string{"READLINE_LINE", "bind -x", "QX_PATH", "--query", "mktemp", "err_file", "cat \"$err_file\" >/dev/tty", "rm -f \"$err_file\""}},
 		{"zsh", []string{"LBUFFER", "bindkey", "QX_PATH", "--query", "mktemp", "err_file", "cat \"$err_file\" >/dev/tty", "rm -f \"$err_file\""}},
-		{"fish", []string{"__qx_widget", "commandline -r", "\\cg", "QX_PATH", "--query", "string collect", "pipestatus"}},
+		{"fish", []string{"__qx_widget", "commandline -r", "\\cg", "QX_PATH", "--query", "string collect", "pipestatus", "mktemp", "err_file", "cat $err_file >/dev/tty", "rm -f $err_file"}},
 	}
 
 	for _, tt := range tests {
