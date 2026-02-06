@@ -13,6 +13,7 @@ Generate shell commands from natural language using LLM.
 - Natural language to shell command conversion
 - Multiple command variants with fuzzy selection
 - Interactive TUI with real-time filtering
+- Pipe command output as context for precise command generation
 - Shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support
 - Support for OpenAI-compatible APIs
 

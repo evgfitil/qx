@@ -1,14 +1,41 @@
 package tui
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/sashabaranov/go-openai"
 
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
 )
+
+// newMockLLMServer creates a test HTTP server that captures the request body
+// and returns a predefined LLM response.
+func newMockLLMServer(t *testing.T, capturedBody *string, responseJSON string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read request body: %v", err)
+		}
+		*capturedBody = string(body)
+
+		resp := openai.ChatCompletionResponse{
+			Choices: []openai.ChatCompletionChoice{
+				{Message: openai.ChatCompletionMessage{Content: responseJSON}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+}
 
 func TestModel_Result_CancelledOnEsc(t *testing.T) {
 	cfg := llm.Config{
@@ -274,15 +301,19 @@ func TestNewModel_WithoutPipeContext(t *testing.T) {
 }
 
 func TestGenerateCommands_WithPipeContext(t *testing.T) {
+	var capturedBody string
+	server := newMockLLMServer(t, &capturedBody, `{"commands": ["docker stop abc"]}`)
+	defer server.Close()
+
 	cfg := llm.Config{
-		BaseURL: "http://localhost:99999",
+		BaseURL: server.URL + "/v1",
 		APIKey:  "test",
 		Model:   "test",
 		Count:   3,
 	}
-	pipeCtx := "some piped data"
+	pipeCtx := "CONTAINER ID\nabc123 nginx"
 
-	cmd := generateCommands("test query", cfg, pipeCtx)
+	cmd := generateCommands("stop nginx", cfg, pipeCtx)
 	if cmd == nil {
 		t.Fatal("expected non-nil tea.Cmd")
 	}
@@ -292,20 +323,32 @@ func TestGenerateCommands_WithPipeContext(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected commandsMsg, got %T", msg)
 	}
-	if cmdMsg.err == nil {
-		t.Fatal("expected error from unreachable server")
+	if cmdMsg.err != nil {
+		t.Fatalf("unexpected error: %v", cmdMsg.err)
+	}
+
+	// JSON encoding escapes angle brackets, so check for the content itself
+	if !strings.Contains(capturedBody, "abc123 nginx") {
+		t.Error("request should contain pipe context data")
+	}
+	if !strings.Contains(capturedBody, "Task: stop nginx") {
+		t.Error("request should contain 'Task:' prefix for the query")
 	}
 }
 
 func TestGenerateCommands_WithoutPipeContext(t *testing.T) {
+	var capturedBody string
+	server := newMockLLMServer(t, &capturedBody, `{"commands": ["ls -la"]}`)
+	defer server.Close()
+
 	cfg := llm.Config{
-		BaseURL: "http://localhost:99999",
+		BaseURL: server.URL + "/v1",
 		APIKey:  "test",
 		Model:   "test",
 		Count:   3,
 	}
 
-	cmd := generateCommands("test query", cfg, "")
+	cmd := generateCommands("list files", cfg, "")
 	if cmd == nil {
 		t.Fatal("expected non-nil tea.Cmd")
 	}
@@ -315,8 +358,12 @@ func TestGenerateCommands_WithoutPipeContext(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected commandsMsg, got %T", msg)
 	}
-	if cmdMsg.err == nil {
-		t.Fatal("expected error from unreachable server")
+	if cmdMsg.err != nil {
+		t.Fatalf("unexpected error: %v", cmdMsg.err)
+	}
+
+	if strings.Contains(capturedBody, "Task:") {
+		t.Error("request should not contain 'Task:' prefix when no pipe context")
 	}
 }
 

@@ -10,6 +10,7 @@ func TestSystemPrompt(t *testing.T) {
 		count          int
 		hasPipeContext bool
 		want           string
+		wantAlso       string
 		wantAbsent     string
 	}{
 		{
@@ -27,10 +28,11 @@ func TestSystemPrompt(t *testing.T) {
 			wantAbsent:     "stdin context",
 		},
 		{
-			name:           "with pipe context includes stdin instructions",
+			name:           "with pipe context includes stdin instructions and count",
 			count:          3,
 			hasPipeContext: true,
 			want:           "stdin context is provided",
+			wantAlso:       "exactly 3 different command variants",
 		},
 	}
 
@@ -42,6 +44,9 @@ func TestSystemPrompt(t *testing.T) {
 			}
 			if !contains(got, tt.want) {
 				t.Errorf("SystemPrompt does not contain expected text: %q", tt.want)
+			}
+			if tt.wantAlso != "" && !contains(got, tt.wantAlso) {
+				t.Errorf("SystemPrompt does not contain expected text: %q", tt.wantAlso)
 			}
 			if tt.wantAbsent != "" && contains(got, tt.wantAbsent) {
 				t.Errorf("SystemPrompt should not contain: %q", tt.wantAbsent)
