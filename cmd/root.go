@@ -87,7 +87,7 @@ func runInteractive(initialQuery string, pipeContext string) error {
 		return ErrCancelled
 	}
 
-	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
+	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend, pipeContext)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
