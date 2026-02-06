@@ -13,7 +13,7 @@ Generate shell commands from natural language using LLM.
 - Natural language to shell command conversion
 - Multiple command variants with fuzzy selection
 - Interactive TUI with real-time filtering
-- Shell integration (Ctrl+G hotkey) with inline editing support
+- Shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support
 - Support for OpenAI-compatible APIs
 
 ## Installation
@@ -63,15 +63,20 @@ export OPENAI_API_KEY="your-key-here"
 
 ### Shell integration (Recommended)
 
+Add the appropriate line to your shell configuration:
+
 ```bash
-# Add to ~/.bashrc or ~/.zshrc
+# Bash (~/.bashrc)
+eval "$(qx --shell-integration bash)"
+
+# Zsh (~/.zshrc)
 eval "$(qx --shell-integration zsh)"
 
-# Then reload your shell config
-source ~/.zshrc  # or ~/.bashrc
-
-# Now press Ctrl+G in terminal to invoke qx
+# Fish (~/.config/fish/config.fish)
+qx --shell-integration fish | source
 ```
+
+Reload your shell config and press Ctrl+G to invoke qx.
 
 **Inline editing**: Start typing a command, press Ctrl+G, and qx will use your
 input as initial query. Add instructions to modify or extend the command.
