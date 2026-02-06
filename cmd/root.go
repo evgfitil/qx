@@ -73,7 +73,10 @@ func run(cmd *cobra.Command, args []string) error {
 func runInteractive(initialQuery string) error {
 	cfg, err := config.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		if _, showErr := tui.ShowError(err, initialQuery); showErr != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		return ErrCancelled
 	}
 
 	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
