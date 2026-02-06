@@ -4,7 +4,7 @@ function __qx_widget
         set qx_cmd $QX_PATH
     end
     set -l current_buffer (commandline)
-    set -l result ($qx_cmd --query "$current_buffer" 2>/dev/tty </dev/tty)
+    set -l result ($qx_cmd --query "$current_buffer" 2>/dev/tty </dev/tty | string collect)
     set -l exit_code $status
     if test \( $exit_code -eq 0 -o $exit_code -eq 130 \) -a -n "$result"
         commandline -r -- "$result"
