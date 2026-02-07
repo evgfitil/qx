@@ -47,6 +47,7 @@ type Model struct {
 	err           error
 	llmConfig     llm.Config
 	forceSend     bool
+	pipeContext   string
 	width         int
 	height        int
 	maxHeight     int
@@ -54,8 +55,8 @@ type Model struct {
 	originalQuery string
 }
 
-// NewModel creates a new TUI model with optional initial query
-func NewModel(cfg llm.Config, initialQuery string, forceSend bool) Model {
+// NewModel creates a new TUI model with optional initial query and pipe context
+func NewModel(cfg llm.Config, initialQuery string, forceSend bool, pipeContext string) Model {
 	ti := textinput.New()
 	ti.Placeholder = "describe the command you need..."
 	ti.Focus()
@@ -75,12 +76,13 @@ func NewModel(cfg llm.Config, initialQuery string, forceSend bool) Model {
 	s.Style = loadingStyle()
 
 	return Model{
-		state:     stateInput,
-		textInput: ti,
-		spinner:   s,
-		llmConfig: cfg,
-		forceSend: forceSend,
-		maxHeight: 10,
+		state:       stateInput,
+		textInput:   ti,
+		spinner:     s,
+		llmConfig:   cfg,
+		forceSend:   forceSend,
+		pipeContext: pipeContext,
+		maxHeight:   10,
 	}
 }
 
@@ -171,7 +173,7 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 		m.originalQuery = query
 		return m, tea.Batch(
 			m.spinner.Tick,
-			generateCommands(query, m.llmConfig),
+			generateCommands(query, m.llmConfig, m.pipeContext),
 		)
 
 	case stateSelect:
@@ -286,7 +288,7 @@ func (m Model) Result() Result {
 	return CancelledResult{Query: m.textInput.Value()}
 }
 
-func generateCommands(query string, cfg llm.Config) tea.Cmd {
+func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd {
 	return func() tea.Msg {
 		provider, err := llm.NewProvider(cfg)
 		if err != nil {
@@ -296,7 +298,7 @@ func generateCommands(query string, cfg llm.Config) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
 		defer cancel()
 
-		commands, err := provider.Generate(ctx, query, cfg.Count)
+		commands, err := provider.Generate(ctx, query, cfg.Count, pipeContext)
 		if err != nil {
 			return commandsMsg{err: err}
 		}

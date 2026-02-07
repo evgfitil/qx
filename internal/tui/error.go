@@ -44,7 +44,7 @@ func ShowError(err error, initialQuery string) (Result, error) {
 		defer tty.Close() //nolint:errcheck
 	}
 
-	p := tea.NewProgram(m, tea.WithOutput(tty))
+	p := tea.NewProgram(m, tea.WithOutput(tty), tea.WithInputTTY())
 
 	if _, runErr := p.Run(); runErr != nil {
 		return nil, runErr

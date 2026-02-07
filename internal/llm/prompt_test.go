@@ -1,35 +1,56 @@
 package llm
 
 import (
+	"strings"
 	"testing"
 )
 
 func TestSystemPrompt(t *testing.T) {
 	tests := []struct {
-		name  string
-		count int
-		want  string
+		name           string
+		count          int
+		hasPipeContext bool
+		want           string
+		wantAlso       string
+		wantAbsent     string
 	}{
 		{
-			name:  "single command",
-			count: 1,
-			want:  "exactly 1 different command variants",
+			name:           "single command without pipe context",
+			count:          1,
+			hasPipeContext: false,
+			want:           "exactly 1 different command variants",
+			wantAbsent:     "stdin context",
 		},
 		{
-			name:  "multiple commands",
-			count: 5,
-			want:  "exactly 5 different command variants",
+			name:           "multiple commands without pipe context",
+			count:          5,
+			hasPipeContext: false,
+			want:           "exactly 5 different command variants",
+			wantAbsent:     "stdin context",
+		},
+		{
+			name:           "with pipe context includes stdin instructions and count",
+			count:          3,
+			hasPipeContext: true,
+			want:           "stdin context is provided",
+			wantAlso:       "exactly 3 different command variants",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SystemPrompt(tt.count)
+			got := SystemPrompt(tt.count, tt.hasPipeContext)
 			if got == "" {
 				t.Error("SystemPrompt returned empty string")
 			}
-			if !contains(got, tt.want) {
+			if !strings.Contains(got, tt.want) {
 				t.Errorf("SystemPrompt does not contain expected text: %q", tt.want)
+			}
+			if tt.wantAlso != "" && !strings.Contains(got, tt.wantAlso) {
+				t.Errorf("SystemPrompt does not contain expected text: %q", tt.wantAlso)
+			}
+			if tt.wantAbsent != "" && strings.Contains(got, tt.wantAbsent) {
+				t.Errorf("SystemPrompt should not contain: %q", tt.wantAbsent)
 			}
 		})
 	}
@@ -91,20 +112,6 @@ func TestParseCommands(t *testing.T) {
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && containsHelper(s, substr)))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 func equalSlices(a, b []string) bool {

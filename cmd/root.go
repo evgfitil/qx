@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/evgfitil/qx/internal/action"
 	"github.com/evgfitil/qx/internal/config"
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
@@ -32,7 +33,13 @@ var rootCmd = &cobra.Command{
 	Use:   "qx [query]",
 	Short: "Generate shell commands using LLM",
 	Long: `qx is a CLI tool that generates shell commands from natural language descriptions.
-It uses LLM to generate multiple command variants and presents them in a fzf-style picker.`,
+It uses LLM to generate multiple command variants and presents them in a fzf-style picker.
+
+After selecting a command, choose an action: execute it, copy to clipboard, or print to stdout.
+
+Pipe command output into qx to provide context for more precise command generation:
+  ls -la | qx "delete files larger than 1GB"
+  docker ps | qx "stop all nginx containers"`,
 	Version:       Version,
 	Args:          cobra.MaximumNArgs(1),
 	RunE:          run,
@@ -62,15 +69,26 @@ func run(cmd *cobra.Command, args []string) error {
 		return handleShellIntegration(shellIntegration)
 	}
 
+	pipeContext, err := readStdin()
+	if err != nil {
+		return err
+	}
+
+	if pipeContext != "" {
+		if err := guard.CheckQuery(pipeContext, forceSend); err != nil {
+			return err
+		}
+	}
+
 	if len(args) == 0 {
-		return runInteractive(queryFlag)
+		return runInteractive(queryFlag, pipeContext)
 	}
 
 	query := args[0]
-	return generateCommands(query)
+	return generateCommands(query, pipeContext)
 }
 
-func runInteractive(initialQuery string) error {
+func runInteractive(initialQuery string, pipeContext string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		if _, showErr := tui.ShowError(err, initialQuery); showErr != nil {
@@ -82,7 +100,7 @@ func runInteractive(initialQuery string) error {
 		return ErrCancelled
 	}
 
-	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend)
+	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend, pipeContext)
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
@@ -95,7 +113,7 @@ func runInteractive(initialQuery string) error {
 		return ErrCancelled
 	case tui.SelectedResult:
 		if r.Command != "" {
-			fmt.Println(r.Command)
+			return handleSelectedCommand(r.Command)
 		}
 		return nil
 	default:
@@ -113,7 +131,7 @@ func handleShellIntegration(shellName string) error {
 }
 
 // generateCommands generates shell commands using LLM based on user query.
-func generateCommands(query string) error {
+func generateCommands(query string, pipeContext string) error {
 	if err := guard.CheckQuery(query, forceSend); err != nil {
 		return err
 	}
@@ -131,7 +149,7 @@ func generateCommands(query string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
 	defer cancel()
 
-	commands, err := provider.Generate(ctx, query, cfg.LLM.Count)
+	commands, err := provider.Generate(ctx, query, cfg.LLM.Count, pipeContext)
 	if err != nil {
 		return fmt.Errorf("failed to generate commands: %w", err)
 	}
@@ -154,8 +172,22 @@ func generateCommands(query string) error {
 	}
 
 	if selected != "" {
-		fmt.Println(selected)
+		return handleSelectedCommand(selected)
 	}
 
+	return nil
+}
+
+// handleSelectedCommand either shows the post-selection action menu (when
+// stdout is a TTY) or prints the command to stdout (when redirected).
+func handleSelectedCommand(command string) error {
+	if action.ShouldPrompt() {
+		err := action.PromptAction(command)
+		if errors.Is(err, action.ErrCancelled) {
+			return ErrCancelled
+		}
+		return err
+	}
+	fmt.Println(command)
 	return nil
 }
