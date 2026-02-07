@@ -35,13 +35,8 @@ func TestDetectShell_CustomShell(t *testing.T) {
 }
 
 func TestDetectShell_UnsetEnv(t *testing.T) {
-	orig, existed := os.LookupEnv("SHELL")
-	os.Unsetenv("SHELL")
-	t.Cleanup(func() {
-		if existed {
-			os.Setenv("SHELL", orig)
-		}
-	})
+	t.Setenv("SHELL", "")
+	os.Unsetenv("SHELL") //nolint:errcheck // always succeeds for valid key
 
 	got := detectShell()
 	if got != "/bin/sh" {
