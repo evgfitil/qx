@@ -10,6 +10,10 @@ linters:
     - staticcheck
     - unused
     - ineffassign
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
 
 formatters:
   enable:
@@ -17,12 +21,5 @@ formatters:
     - goimports
   settings:
     goimports:
-      local-prefixes: github.com/evgfitil/qx
-
-linters-settings:
-  errcheck:
-    exclude-functions:
-      - (io.Closer).Close
-
-issues:
-  exclude-use-default: false
+      local-prefixes:
+        - github.com/evgfitil/qx
