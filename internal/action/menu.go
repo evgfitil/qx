@@ -82,15 +82,19 @@ func PromptAction(command string) error {
 // is nil, it opens /dev/tty and sets raw mode; otherwise it reads from
 // the provided reader.
 func promptActionWith(command string, ttyReader io.Reader) error {
-	fmt.Fprintf(os.Stderr, "\n  %s\n\n  [e]xecute  [c]opy  [q]uit ", command)
+	hi := "\033[38;5;205m"
+	rs := "\033[0m"
+	fmt.Fprintf(os.Stderr, "\n  %s\n\n  [%se%s]xecute  [%sc%s]opy  [%sq%s]uit ", command, hi, rs, hi, rs, hi, rs)
 
 	act, err := readAction(ttyReader)
 	if err != nil {
 		return err
 	}
 
-	// Clear the prompt line
 	fmt.Fprintln(os.Stderr)
+	if act == ActionExecute {
+		fmt.Fprintln(os.Stderr)
+	}
 
 	return dispatchAction(act, command)
 }

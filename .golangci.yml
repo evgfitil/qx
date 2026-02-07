@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
 
@@ -7,18 +9,20 @@ linters:
     - govet
     - staticcheck
     - unused
-    - gosimple
     - ineffassign
-    - typecheck
+
+formatters:
+  enable:
     - gofmt
     - goimports
+  settings:
+    goimports:
+      local-prefixes: github.com/evgfitil/qx
 
 linters-settings:
   errcheck:
     exclude-functions:
       - (io.Closer).Close
-  goimports:
-    local-prefixes: github.com/evgfitil/qx
 
 issues:
   exclude-use-default: false
