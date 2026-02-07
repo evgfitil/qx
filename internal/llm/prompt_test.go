@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -42,13 +43,13 @@ func TestSystemPrompt(t *testing.T) {
 			if got == "" {
 				t.Error("SystemPrompt returned empty string")
 			}
-			if !contains(got, tt.want) {
+			if !strings.Contains(got, tt.want) {
 				t.Errorf("SystemPrompt does not contain expected text: %q", tt.want)
 			}
-			if tt.wantAlso != "" && !contains(got, tt.wantAlso) {
+			if tt.wantAlso != "" && !strings.Contains(got, tt.wantAlso) {
 				t.Errorf("SystemPrompt does not contain expected text: %q", tt.wantAlso)
 			}
-			if tt.wantAbsent != "" && contains(got, tt.wantAbsent) {
+			if tt.wantAbsent != "" && strings.Contains(got, tt.wantAbsent) {
 				t.Errorf("SystemPrompt should not contain: %q", tt.wantAbsent)
 			}
 		})
@@ -111,20 +112,6 @@ func TestParseCommands(t *testing.T) {
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && containsHelper(s, substr)))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 func equalSlices(a, b []string) bool {

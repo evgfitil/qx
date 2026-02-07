@@ -1,12 +1,22 @@
 package action
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 
 	"github.com/mattn/go-isatty"
 )
+
+// ExitError wraps a subprocess exit code so callers can propagate it.
+type ExitError struct {
+	Code int
+}
+
+func (e *ExitError) Error() string {
+	return fmt.Sprintf("exit status %d", e.Code)
+}
 
 // detectShell returns the user's shell from $SHELL env var,
 // falling back to /bin/sh if unset.
@@ -40,6 +50,10 @@ func Execute(command string) error {
 	}
 
 	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return &ExitError{Code: exitErr.ExitCode()}
+		}
 		return fmt.Errorf("command execution failed: %w", err)
 	}
 	return nil

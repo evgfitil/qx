@@ -58,7 +58,7 @@ func readKeypress(r io.Reader) (Action, error) {
 
 // drainEscapeSequence reads and discards trailing bytes of a multi-byte
 // escape sequence (e.g. arrow keys send \x1b[A — 3 bytes). Uses a short
-// deadline when the reader supports it, otherwise reads non-blockingly.
+// deadline when the reader supports it (e.g. *os.File on Unix).
 func drainEscapeSequence(r io.Reader) {
 	type deadliner interface {
 		SetReadDeadline(t time.Time) error

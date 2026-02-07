@@ -1,6 +1,7 @@
 package action
 
 import (
+	"errors"
 	"io"
 	"os"
 	"testing"
@@ -62,7 +63,32 @@ func TestExecute_FailingCommand(t *testing.T) {
 
 	err := Execute("false")
 	if err == nil {
-		t.Error("Execute(\"false\") expected error, got nil")
+		t.Fatal("Execute(\"false\") expected error, got nil")
+	}
+
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected ExitError, got %T: %v", err, err)
+	}
+	if exitErr.Code != 1 {
+		t.Errorf("expected exit code 1, got %d", exitErr.Code)
+	}
+}
+
+func TestExecute_ExitCode2(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+
+	err := Execute("exit 2")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected ExitError, got %T: %v", err, err)
+	}
+	if exitErr.Code != 2 {
+		t.Errorf("expected exit code 2, got %d", exitErr.Code)
 	}
 }
 

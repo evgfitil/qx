@@ -142,6 +142,7 @@ After selecting a command (in any mode), an action menu appears:
 - `e` - execute the command in a subprocess
 - `c` - copy to clipboard
 - `q` or Enter - print to stdout
+- Esc or Ctrl+C - cancel without any action
 
 The menu only appears when running in a terminal. When stdout is redirected
 (e.g., via shell integration Ctrl+G), the command is printed to stdout directly.

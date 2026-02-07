@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"testing"
+
+	"github.com/atotto/clipboard"
 )
 
 func TestShouldPrompt_WithPipe(t *testing.T) {
@@ -108,7 +110,12 @@ func TestDispatchAction_Execute_Failure(t *testing.T) {
 
 	err := dispatchAction(ActionExecute, "false")
 	if err == nil {
-		t.Error("dispatchAction(ActionExecute, \"false\") expected error, got nil")
+		t.Fatal("dispatchAction(ActionExecute, \"false\") expected error, got nil")
+	}
+
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected ExitError, got %T: %v", err, err)
 	}
 }
 
@@ -218,6 +225,42 @@ func TestReadKeypress_EscapeSequence(t *testing.T) {
 	}
 	if act != ActionCancel {
 		t.Errorf("readKeypress(escape sequence) = %d, want ActionCancel(%d)", act, ActionCancel)
+	}
+}
+
+func TestDispatchAction_Copy(t *testing.T) {
+	if clipboard.Unsupported {
+		t.Skip("clipboard not available in this environment")
+	}
+
+	// Redirect stderr to capture "Copied to clipboard." message
+	origStderr := os.Stderr
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+	os.Stderr = stderrW
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	dispatchErr := dispatchAction(ActionCopy, "echo hello")
+	_ = stderrW.Close()
+
+	if dispatchErr != nil {
+		t.Errorf("dispatchAction(ActionCopy) returned error: %v", dispatchErr)
+	}
+
+	stderrOut, _ := io.ReadAll(stderrR)
+	_ = stderrR.Close()
+	if string(stderrOut) != "Copied to clipboard.\n" {
+		t.Errorf("stderr output = %q, want %q", string(stderrOut), "Copied to clipboard.\n")
+	}
+
+	got, clipErr := clipboard.ReadAll()
+	if clipErr != nil {
+		t.Fatalf("clipboard.ReadAll() returned error: %v", clipErr)
+	}
+	if got != "echo hello" {
+		t.Errorf("clipboard content = %q, want %q", got, "echo hello")
 	}
 }
 

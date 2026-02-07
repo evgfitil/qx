@@ -39,6 +39,10 @@ func TestGenerateCommands_EmptyPipeContextSkipsGuard(t *testing.T) {
 	defer func() { forceSend = origForceSend }()
 	forceSend = false
 
+	// Point config to a nonexistent directory so config.Load() always fails,
+	// regardless of the developer's local environment.
+	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+
 	// With empty pipe context, only the query is checked.
 	// Should pass guard check and fail later at config.Load().
 	err := generateCommands("list files", "")
