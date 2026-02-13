@@ -89,7 +89,7 @@ func FormatCommand(cmd string) string {
 	return strings.TrimSpace(result.String())
 }
 
-var continuationRe = regexp.MustCompile(`\s*\\\n[\t ]*`)
+var continuationRe = regexp.MustCompile(`[ \t]*\\\n[\t ]*`)
 
 // UnformatCommand reverses FormatCommand by joining line continuations
 // back into a single-line command. Sequences of \<newline><whitespace>

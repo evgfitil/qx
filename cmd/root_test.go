@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/evgfitil/qx/internal/guard"
-	"github.com/evgfitil/qx/internal/llm"
 )
 
 func TestErrCancelled_CanBeExtracted(t *testing.T) {
@@ -84,40 +83,24 @@ func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 	}
 }
 
-func TestRunInteractive_MultilineQueryIsUnformatted(t *testing.T) {
-	// Verify that multiline queries (with line continuations) are cleaned
-	// before being passed to the TUI. In test environment config.Load fails,
-	// so we verify through the llm.UnformatCommand integration that the
-	// transformation matches expected behavior.
+func TestRunInteractive_MultilineQueryDoesNotPanic(t *testing.T) {
+	// Smoke test: runInteractive with multiline query (line continuations)
+	// should not panic. Config error is expected in test environment.
 	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
 
 	multilineQuery := "ps aux \\\n\t| grep nginx \\\n\t| sort"
-	expectedClean := "ps aux | grep nginx | sort"
 
-	// Confirm UnformatCommand produces expected result (integration sanity check).
-	if got := llm.UnformatCommand(multilineQuery); got != expectedClean {
-		t.Fatalf("UnformatCommand(%q) = %q, want %q", multilineQuery, got, expectedClean)
-	}
-
-	// runInteractive should not panic or produce unexpected errors with
-	// multiline input. Config error is expected in test environment.
 	err := runInteractive(multilineQuery, "")
 	if err == nil {
 		t.Fatal("expected error from config.Load() in test environment")
 	}
 }
 
-func TestRunInteractive_SimpleQueryPassedThrough(t *testing.T) {
-	// Simple queries without continuations should pass through unchanged.
+func TestRunInteractive_SimpleQueryDoesNotPanic(t *testing.T) {
+	// Smoke test: runInteractive with a simple query should not panic.
 	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
 
-	simpleQuery := "list all running containers"
-
-	if got := llm.UnformatCommand(simpleQuery); got != simpleQuery {
-		t.Fatalf("UnformatCommand(%q) = %q, want unchanged", simpleQuery, got)
-	}
-
-	err := runInteractive(simpleQuery, "")
+	err := runInteractive("list all running containers", "")
 	if err == nil {
 		t.Fatal("expected error from config.Load() in test environment")
 	}

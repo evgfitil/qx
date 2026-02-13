@@ -135,6 +135,7 @@ func TestFormatUnformatRoundTrip(t *testing.T) {
 		"test -f file || touch file",
 		"echo 'hello | world'",
 		"echo 'unclosed",
+		"cmd1 | cmd2 && cmd3 || cmd4",
 	}
 
 	for _, cmd := range commands {
