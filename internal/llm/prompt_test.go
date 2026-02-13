@@ -49,6 +49,13 @@ func TestSystemPrompt(t *testing.T) {
 			want:           "native query capabilities rather than text processing with grep/awk/sed",
 			wantAlso:       "built-in filtering, selection, and formatting options",
 		},
+		{
+			name:           "pipe context includes source tool rule",
+			count:          3,
+			hasPipeContext: true,
+			want:           "Identify the source tool from the context and prefer using its built-in capabilities",
+			wantAlso:       "over adding separate tools to the pipeline",
+		},
 	}
 
 	for _, tt := range tests {

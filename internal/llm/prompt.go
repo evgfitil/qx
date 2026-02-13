@@ -18,7 +18,8 @@ func SystemPrompt(count int, hasPipeContext bool) string {
 	if hasPipeContext {
 		pipeRules = `
 - When stdin context is provided, use the concrete values from it to generate precise commands
-- Generate commands that reference actual data from the context (file names, container IDs, process IDs, etc.)`
+- Generate commands that reference actual data from the context (file names, container IDs, process IDs, etc.)
+- Identify the source tool from the context and prefer using its built-in capabilities for filtering, sorting, and formatting over adding separate tools to the pipeline`
 	}
 
 	return fmt.Sprintf(`You are a shell command generator. Generate shell commands based on user descriptions.
