@@ -23,7 +23,10 @@ func requireEnv(t *testing.T, key string) string {
 func newTestProvider(t *testing.T) Provider {
 	t.Helper()
 	apiKey := requireEnv(t, "OPENAI_API_KEY")
-	baseURL := requireEnv(t, "LLM_BASE_URL")
+	baseURL := os.Getenv("LLM_BASE_URL")
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
 	model := os.Getenv("LLM_MODEL")
 
 	if model == "" {
