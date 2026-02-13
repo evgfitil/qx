@@ -23,12 +23,9 @@ func requireEnv(t *testing.T, key string) string {
 func newTestProvider(t *testing.T) Provider {
 	t.Helper()
 	apiKey := requireEnv(t, "OPENAI_API_KEY")
-	baseURL := os.Getenv("LLM_BASE_URL")
+	baseURL := requireEnv(t, "LLM_BASE_URL")
 	model := os.Getenv("LLM_MODEL")
 
-	if baseURL == "" {
-		baseURL = "https://api.eliza.yandex.net/raw/openai/v1"
-	}
 	if model == "" {
 		model = "gpt-4o-mini"
 	}
@@ -44,21 +41,8 @@ func newTestProvider(t *testing.T) Provider {
 	return provider
 }
 
-// countPipes returns the number of pipe characters in a command
-func countPipes(cmd string) int {
-	count := 0
-	for _, ch := range cmd {
-		if ch == '|' {
-			count++
-		}
-	}
-	return count
-}
-
 func TestE2E_SingleToolPreference_NoPipe(t *testing.T) {
 	provider := newTestProvider(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	tests := []struct {
 		name     string
@@ -79,6 +63,9 @@ func TestE2E_SingleToolPreference_NoPipe(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
 			commands, err := provider.Generate(ctx, tt.query, 3, "")
 			if err != nil {
 				t.Fatalf("Generate failed: %v", err)
@@ -86,7 +73,7 @@ func TestE2E_SingleToolPreference_NoPipe(t *testing.T) {
 
 			t.Logf("Query: %s", tt.query)
 			for i, cmd := range commands {
-				t.Logf("  [%d] %s (pipes: %d)", i, cmd, countPipes(cmd))
+				t.Logf("  [%d] %s (pipes: %d)", i, cmd, strings.Count(cmd, "|"))
 			}
 
 			hasHint := false
@@ -100,10 +87,9 @@ func TestE2E_SingleToolPreference_NoPipe(t *testing.T) {
 				t.Errorf("expected at least one command containing %q", tt.wantHint)
 			}
 
-			// Check that at least one command has minimal pipes (0 or 1)
 			hasMinimalPipe := false
 			for _, cmd := range commands {
-				if countPipes(cmd) <= 1 {
+				if strings.Count(cmd, "|") <= 1 {
 					hasMinimalPipe = true
 					break
 				}
@@ -117,8 +103,6 @@ func TestE2E_SingleToolPreference_NoPipe(t *testing.T) {
 
 func TestE2E_SingleToolPreference_WithPipe(t *testing.T) {
 	provider := newTestProvider(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	tests := []struct {
 		name        string
@@ -142,6 +126,9 @@ func TestE2E_SingleToolPreference_WithPipe(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
 			commands, err := provider.Generate(ctx, tt.query, 3, tt.pipeContext)
 			if err != nil {
 				t.Fatalf("Generate failed: %v", err)
@@ -149,7 +136,7 @@ func TestE2E_SingleToolPreference_WithPipe(t *testing.T) {
 
 			t.Logf("Query: %s (pipe context provided)", tt.query)
 			for i, cmd := range commands {
-				t.Logf("  [%d] %s (pipes: %d)", i, cmd, countPipes(cmd))
+				t.Logf("  [%d] %s (pipes: %d)", i, cmd, strings.Count(cmd, "|"))
 			}
 
 			hasHint := false
@@ -163,14 +150,16 @@ func TestE2E_SingleToolPreference_WithPipe(t *testing.T) {
 				t.Errorf("expected at least one command containing %q", tt.wantHint)
 			}
 
-			// For pipe tests, verify commands minimize additional pipes
-			// Commands should use the source tool's capabilities
-			totalPipes := 0
+			hasMinimalPipe := false
 			for _, cmd := range commands {
-				totalPipes += countPipes(cmd)
+				if strings.Count(cmd, "|") <= 1 {
+					hasMinimalPipe = true
+					break
+				}
 			}
-			avgPipes := float64(totalPipes) / float64(len(commands))
-			t.Logf("  Average pipes per command: %.1f", avgPipes)
+			if !hasMinimalPipe {
+				t.Errorf("expected at least one command with 0-1 pipes, all have more")
+			}
 		})
 	}
 }

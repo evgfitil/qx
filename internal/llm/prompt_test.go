@@ -41,6 +41,7 @@ func TestSystemPrompt(t *testing.T) {
 			hasPipeContext: false,
 			want:           "single tool's full capabilities over chaining multiple tools",
 			wantAlso:       "Minimize pipe chains",
+			wantAbsent:     "Prefer common Unix utilities",
 		},
 		{
 			name:           "base prompt includes native query rule",
