@@ -35,6 +35,20 @@ func TestSystemPrompt(t *testing.T) {
 			want:           "stdin context is provided",
 			wantAlso:       "exactly 3 different command variants",
 		},
+		{
+			name:           "base prompt prefers single tool over pipe chains",
+			count:          3,
+			hasPipeContext: false,
+			want:           "single tool's full capabilities over chaining multiple tools",
+			wantAlso:       "Minimize pipe chains",
+		},
+		{
+			name:           "base prompt includes native query rule",
+			count:          3,
+			hasPipeContext: false,
+			want:           "native query capabilities rather than text processing with grep/awk/sed",
+			wantAlso:       "built-in filtering, selection, and formatting options",
+		},
 	}
 
 	for _, tt := range tests {
