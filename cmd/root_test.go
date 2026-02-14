@@ -83,6 +83,29 @@ func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 	}
 }
 
+func TestRunInteractive_MultilineQueryDoesNotPanic(t *testing.T) {
+	// Smoke test: runInteractive with multiline query (line continuations)
+	// should not panic. Config error is expected in test environment.
+	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+
+	multilineQuery := "ps aux \\\n\t| grep nginx \\\n\t| sort"
+
+	err := runInteractive(multilineQuery, "")
+	if err == nil {
+		t.Fatal("expected error from config.Load() in test environment")
+	}
+}
+
+func TestRunInteractive_SimpleQueryDoesNotPanic(t *testing.T) {
+	// Smoke test: runInteractive with a simple query should not panic.
+	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+
+	err := runInteractive("list all running containers", "")
+	if err == nil {
+		t.Fatal("expected error from config.Load() in test environment")
+	}
+}
+
 func TestHandleSelectedCommand_NonTTY_EmptyCommand(t *testing.T) {
 	// Even with empty command, non-TTY path should print and return nil.
 	r, w, err := os.Pipe()

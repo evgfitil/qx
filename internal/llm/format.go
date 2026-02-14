@@ -1,6 +1,9 @@
 package llm
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 func trimTrailingSpace(b *strings.Builder) {
 	s := b.String()
@@ -84,4 +87,16 @@ func FormatCommand(cmd string) string {
 	}
 
 	return strings.TrimSpace(result.String())
+}
+
+var continuationRe = regexp.MustCompile(`[ \t]*\\\n[\t ]*`)
+
+// UnformatCommand reverses FormatCommand by joining line continuations
+// back into a single-line command. Sequences of \<newline><whitespace>
+// are collapsed into a single space.
+func UnformatCommand(cmd string) string {
+	if !strings.Contains(cmd, "\\\n") {
+		return cmd
+	}
+	return strings.TrimSpace(continuationRe.ReplaceAllString(cmd, " "))
 }

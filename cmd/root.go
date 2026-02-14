@@ -89,6 +89,8 @@ func run(cmd *cobra.Command, args []string) error {
 }
 
 func runInteractive(initialQuery string, pipeContext string) error {
+	initialQuery = llm.UnformatCommand(initialQuery)
+
 	cfg, err := config.Load()
 	if err != nil {
 		if _, showErr := tui.ShowError(err, initialQuery); showErr != nil {
