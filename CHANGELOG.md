@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Multiline command corruption on repeated hotkey invocation
+
+## [0.7.1] - 2026-02-13
+
+### Changed
+
+- LLM prompt prefers single tool capabilities over pipe chains
+
+## [0.7.0] - 2026-02-07
+
+### Added
+
+- Stdin pipe support for context-aware command generation
+- Post-selection action menu: execute, copy to clipboard, or quit
+
+## [0.6.1] - 2026-02-06
+
+### Fixed
+
+- Startup errors now display inside TUI instead of corrupting prompt theme
+
+## [0.6.0] - 2026-02-06
+
+### Added
+
+- Fish shell integration
+
 ## [0.5.0] - 2026-02-03
 
 ### Added
@@ -72,7 +101,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shell integration (bash, zsh)
 - Goreleaser and release workflow
 
-[Unreleased]: https://github.com/evgfitil/qx/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/evgfitil/qx/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/evgfitil/qx/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/evgfitil/qx/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/evgfitil/qx/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/evgfitil/qx/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/evgfitil/qx/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/evgfitil/qx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/evgfitil/qx/compare/v0.3.1...v0.3.2
