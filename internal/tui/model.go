@@ -62,12 +62,15 @@ func NewModel(cfg llm.Config, initialQuery string, forceSend bool, pipeContext s
 	ta.Placeholder = "describe the command you need..."
 	ta.ShowLineNumbers = false
 	ta.MaxHeight = 3
+	ta.SetHeight(3)
 	ta.CharLimit = 256
 	ta.Prompt = "> "
 	ta.FocusedStyle.Prompt = promptStyle()
 	ta.FocusedStyle.Text = lipgloss.NewStyle()
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys())
+	ta.KeyMap.LineNext = key.NewBinding(key.WithKeys())
+	ta.KeyMap.LinePrevious = key.NewBinding(key.WithKeys())
 	ta.Focus()
 
 	if initialQuery != "" {
