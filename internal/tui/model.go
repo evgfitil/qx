@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -38,7 +39,7 @@ type commandsMsg struct {
 // Model represents the TUI state
 type Model struct {
 	state         state
-	textInput     textinput.Model
+	textArea      textarea.Model
 	spinner       spinner.Model
 	commands      []string
 	cursor        int
@@ -57,18 +58,21 @@ type Model struct {
 
 // NewModel creates a new TUI model with optional initial query and pipe context
 func NewModel(cfg llm.Config, initialQuery string, forceSend bool, pipeContext string) Model {
-	ti := textinput.New()
-	ti.Placeholder = "describe the command you need..."
-	ti.Focus()
-	ti.CharLimit = 256
-	ti.Width = 50
-	ti.Prompt = "> "
-	ti.PromptStyle = promptStyle()
-	ti.Cursor.Style = cursorStyle()
+	ta := textarea.New()
+	ta.Placeholder = "describe the command you need..."
+	ta.ShowLineNumbers = false
+	ta.MaxHeight = 3
+	ta.CharLimit = 256
+	ta.Prompt = "> "
+	ta.FocusedStyle.Prompt = promptStyle()
+	ta.FocusedStyle.Text = lipgloss.NewStyle()
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys())
+	ta.Focus()
 
 	if initialQuery != "" {
-		ti.SetValue(initialQuery)
-		ti.CursorEnd()
+		ta.SetValue(initialQuery)
+		ta.CursorEnd()
 	}
 
 	s := spinner.New()
@@ -77,7 +81,7 @@ func NewModel(cfg llm.Config, initialQuery string, forceSend bool, pipeContext s
 
 	return Model{
 		state:       stateInput,
-		textInput:   ti,
+		textArea:    ta,
 		spinner:     s,
 		llmConfig:   cfg,
 		forceSend:   forceSend,
@@ -87,7 +91,7 @@ func NewModel(cfg llm.Config, initialQuery string, forceSend bool, pipeContext s
 }
 
 func (m Model) Init() tea.Cmd {
-	return textinput.Blink
+	return textarea.Blink
 }
 
 // Update implements tea.Model
@@ -99,7 +103,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.maxHeight = max(msg.Height*maxHeightPercent/100, minHeight)
-		m.textInput.Width = msg.Width - 4
+		m.textArea.SetWidth(msg.Width - 2)
 
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -131,8 +135,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filtered = msg.commands
 		m.cursor = 0
 		m.state = stateSelect
-		m.textInput.SetValue("")
-		m.textInput.Placeholder = "filter results..."
+		m.textArea.SetValue("")
+		m.textArea.Placeholder = "filter results..."
 		return m, nil
 
 	case spinner.TickMsg:
@@ -145,7 +149,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if m.state == stateInput || m.state == stateSelect {
 		var cmd tea.Cmd
-		m.textInput, cmd = m.textInput.Update(msg)
+		m.textArea, cmd = m.textArea.Update(msg)
 		cmds = append(cmds, cmd)
 
 		if m.state == stateSelect {
@@ -159,7 +163,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.state {
 	case stateInput:
-		query := strings.TrimSpace(m.textInput.Value())
+		query := strings.TrimSpace(m.textArea.Value())
 		if query == "" {
 			return m, nil
 		}
@@ -190,7 +194,7 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateFilter() Model {
-	filter := strings.ToLower(m.textInput.Value())
+	filter := strings.ToLower(m.textArea.Value())
 	if filter == "" {
 		m.filtered = m.commands
 	} else {
@@ -231,7 +235,7 @@ func (m Model) View() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(m.textInput.View())
+	b.WriteString(m.textArea.View())
 	b.WriteString("\n")
 
 	switch m.state {
@@ -280,12 +284,12 @@ func (m Model) Result() Result {
 	if m.selected != "" {
 		return SelectedResult{Command: m.selected}
 	}
-	// In select/loading states, textInput may contain filter text or still has query,
+	// In select/loading states, textArea may contain filter text or still has query,
 	// but originalQuery always has the submitted query
 	if (m.state == stateSelect || m.state == stateLoading) && m.originalQuery != "" {
 		return CancelledResult{Query: m.originalQuery}
 	}
-	return CancelledResult{Query: m.textInput.Value()}
+	return CancelledResult{Query: m.textArea.Value()}
 }
 
 func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd {

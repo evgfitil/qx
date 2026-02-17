@@ -26,10 +26,6 @@ func promptStyle() lipgloss.Style {
 	return getRenderer().NewStyle().Foreground(lipgloss.Color("205"))
 }
 
-func cursorStyle() lipgloss.Style {
-	return getRenderer().NewStyle().Foreground(lipgloss.Color("205"))
-}
-
 func selectedStyle() lipgloss.Style {
 	return getRenderer().NewStyle().Foreground(lipgloss.Color("170")).Bold(true)
 }

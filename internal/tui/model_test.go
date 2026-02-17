@@ -180,8 +180,8 @@ func TestModel_Result_ModifiedQueryOnEsc(t *testing.T) {
 
 	// Now the text input should contain "list files with details"
 	expectedQuery := "list files with details"
-	if m.textInput.Value() != expectedQuery {
-		t.Fatalf("precondition failed: expected input value %q, got %q", expectedQuery, m.textInput.Value())
+	if m.textArea.Value() != expectedQuery {
+		t.Fatalf("precondition failed: expected input value %q, got %q", expectedQuery, m.textArea.Value())
 	}
 
 	// Simulate Esc press
@@ -216,7 +216,7 @@ func TestModel_Result_CancelledFromSelectState(t *testing.T) {
 	m.commands = []string{"ls -la", "ls -lah", "ls -l"}
 	m.filtered = m.commands
 	m.state = stateSelect
-	m.textInput.SetValue("") // This happens when transitioning to stateSelect
+	m.textArea.SetValue("") // This happens when transitioning to stateSelect
 
 	// Simulate Esc press while in select state
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -363,6 +363,64 @@ func TestGenerateCommands_WithoutPipeContext(t *testing.T) {
 
 	if strings.Contains(capturedBody, "Task:") {
 		t.Error("request should not contain 'Task:' prefix when no pipe context")
+	}
+}
+
+func TestNewModel_TextAreaConfig(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+
+	if m.textArea.ShowLineNumbers {
+		t.Error("expected ShowLineNumbers = false")
+	}
+	if m.textArea.MaxHeight != 3 {
+		t.Errorf("expected MaxHeight = 3, got %d", m.textArea.MaxHeight)
+	}
+	if m.textArea.CharLimit != 256 {
+		t.Errorf("expected CharLimit = 256, got %d", m.textArea.CharLimit)
+	}
+	if m.textArea.Prompt != "> " {
+		t.Errorf("expected Prompt = %q, got %q", "> ", m.textArea.Prompt)
+	}
+	if m.textArea.Placeholder != "describe the command you need..." {
+		t.Errorf("expected default placeholder, got %q", m.textArea.Placeholder)
+	}
+}
+
+func TestNewModel_TextAreaInitialQuery(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	initialQuery := "list running containers"
+	m := NewModel(cfg, initialQuery, false, "")
+
+	if m.textArea.Value() != initialQuery {
+		t.Errorf("expected textarea value = %q, got %q", initialQuery, m.textArea.Value())
+	}
+}
+
+func TestNewModel_TextAreaEmptyInitialQuery(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+
+	if m.textArea.Value() != "" {
+		t.Errorf("expected empty textarea value, got %q", m.textArea.Value())
 	}
 }
 
