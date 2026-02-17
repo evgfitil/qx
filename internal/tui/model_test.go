@@ -2,6 +2,7 @@ package tui
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -529,6 +530,185 @@ func TestEscKey_CancelsInAllStates(t *testing.T) {
 				t.Errorf("expected quitting = true after Esc in %s", tt.name)
 			}
 		})
+	}
+}
+
+func TestView_ContainsTextAreaContent(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "list files", false, "")
+	// Set width so textarea renders properly
+	m.width = 80
+	m.textArea.SetWidth(78)
+
+	view := m.View()
+
+	// View should contain the textarea value
+	if !strings.Contains(view, "list files") {
+		t.Errorf("expected View to contain textarea value 'list files', got:\n%s", view)
+	}
+}
+
+func TestView_StateSelect_ShowsCommands(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+	m.commands = []string{"ls -la", "ls -lah", "ls -l"}
+	m.filtered = m.commands
+	m.state = stateSelect
+	m.cursor = 0
+	m.width = 80
+	m.maxHeight = 10
+	m.textArea.SetWidth(78)
+
+	view := m.View()
+
+	// View should contain the commands
+	if !strings.Contains(view, "ls -la") {
+		t.Errorf("expected View to contain 'ls -la', got:\n%s", view)
+	}
+	if !strings.Contains(view, "ls -lah") {
+		t.Errorf("expected View to contain 'ls -lah', got:\n%s", view)
+	}
+	// View should contain the counter
+	if !strings.Contains(view, "3/3") {
+		t.Errorf("expected View to contain counter '3/3', got:\n%s", view)
+	}
+}
+
+func TestView_StateLoading_ShowsSpinner(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "test", false, "")
+	m.state = stateLoading
+	m.width = 80
+	m.textArea.SetWidth(78)
+
+	view := m.View()
+
+	if !strings.Contains(view, "Generating commands...") {
+		t.Errorf("expected View to contain 'Generating commands...', got:\n%s", view)
+	}
+}
+
+func TestView_Quitting_ReturnsEmpty(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+	m.quitting = true
+	m.selected = ""
+
+	view := m.View()
+
+	if view != "" {
+		t.Errorf("expected empty View when quitting with no selection, got:\n%s", view)
+	}
+}
+
+func TestView_StateInput_ShowsError(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+	m.state = stateInput
+	m.err = fmt.Errorf("test error")
+	m.width = 80
+	m.textArea.SetWidth(78)
+
+	view := m.View()
+
+	if !strings.Contains(view, "test error") {
+		t.Errorf("expected View to contain error message, got:\n%s", view)
+	}
+}
+
+func TestResult_ReturnsCorrectQueryFromTextArea(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+	m.textArea.SetValue("find large files")
+
+	result := m.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatal("expected CancelledResult when in stateInput with no selection")
+	}
+	if cancelled.Query != "find large files" {
+		t.Errorf("expected Query = %q, got %q", "find large files", cancelled.Query)
+	}
+}
+
+func TestResult_SelectedResultFromSelection(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+	m.selected = "docker ps -a"
+
+	result := m.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatal("expected SelectedResult when command is selected")
+	}
+	if selected.Command != "docker ps -a" {
+		t.Errorf("expected Command = %q, got %q", "docker ps -a", selected.Command)
+	}
+}
+
+func TestResult_OriginalQueryInSelectState(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+	m.state = stateSelect
+	m.originalQuery = "list containers"
+	m.textArea.SetValue("filter text")
+
+	result := m.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatal("expected CancelledResult in select state with no selection")
+	}
+	// Should return original query, not the filter text
+	if cancelled.Query != "list containers" {
+		t.Errorf("expected Query = %q, got %q", "list containers", cancelled.Query)
 	}
 }
 

@@ -26,7 +26,7 @@ const (
 
 const (
 	maxHeightPercent = 40 // percentage of terminal height for TUI
-	reservedLines    = 3  // lines reserved for prompt and counter
+	reservedLines    = 5  // lines reserved for textarea (up to 3 lines) and counter
 	minHeight        = 5  // minimum TUI height
 )
 
