@@ -26,7 +26,7 @@ const (
 
 const (
 	maxHeightPercent = 40 // percentage of terminal height for TUI
-	reservedLines    = 5  // lines reserved for textarea (up to 3 lines) and counter
+	reservedLines    = 3  // lines reserved for textarea (1 line in filter mode) and counter
 	minHeight        = 5  // minimum TUI height
 )
 
@@ -140,6 +140,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = stateSelect
 		m.textArea.SetValue("")
 		m.textArea.Placeholder = "filter results..."
+		m.textArea.MaxHeight = 1
+		m.textArea.SetHeight(1)
 		return m, nil
 
 	case spinner.TickMsg:
