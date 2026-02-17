@@ -424,6 +424,114 @@ func TestNewModel_TextAreaEmptyInitialQuery(t *testing.T) {
 	}
 }
 
+func TestEnterKey_SubmitsInStateInput(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "list files", false, "")
+
+	// Enter in stateInput should transition to stateLoading (submission)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateLoading {
+		t.Errorf("expected state = stateLoading after Enter in stateInput, got %d", model.state)
+	}
+	if cmd == nil {
+		t.Error("expected non-nil command after Enter submission")
+	}
+	if model.originalQuery != "list files" {
+		t.Errorf("expected originalQuery = %q, got %q", "list files", model.originalQuery)
+	}
+}
+
+func TestEnterKey_SelectsInStateSelect(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+	m.commands = []string{"ls -la", "ls -lah"}
+	m.filtered = m.commands
+	m.state = stateSelect
+	m.cursor = 0
+
+	// Enter in stateSelect should select the command and quit
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.selected != "ls -la" {
+		t.Errorf("expected selected = %q, got %q", "ls -la", model.selected)
+	}
+	if !model.quitting {
+		t.Error("expected quitting = true after Enter in stateSelect")
+	}
+}
+
+func TestEnterKey_DoesNotInsertNewline(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "test query", false, "")
+
+	// Simulate pressing Enter - should NOT add a newline to textarea value
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	// The model should have transitioned to loading (not stayed in input with newline)
+	if model.state != stateLoading {
+		t.Errorf("expected stateLoading, got %d", model.state)
+	}
+
+	// The textarea should not contain any newlines from Enter key
+	if strings.Contains(model.textArea.Value(), "\n") {
+		t.Error("Enter key should not insert newline into textarea")
+	}
+}
+
+func TestEscKey_CancelsInAllStates(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	tests := []struct {
+		name  string
+		state state
+	}{
+		{"stateInput", stateInput},
+		{"stateLoading", stateLoading},
+		{"stateSelect", stateSelect},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewModel(cfg, "test", false, "")
+			m.state = tt.state
+
+			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			model := updated.(Model)
+
+			if !model.quitting {
+				t.Errorf("expected quitting = true after Esc in %s", tt.name)
+			}
+		})
+	}
+}
+
 func TestHandleEnter_PipeContextNoSecret(t *testing.T) {
 	cfg := llm.Config{
 		BaseURL: "http://localhost",
