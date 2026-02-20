@@ -279,6 +279,65 @@ func TestRunLast_StoreCreationError(t *testing.T) {
 	}
 }
 
+func TestRunHistory_EmptyHistory(t *testing.T) {
+	withTempHistoryStore(t)
+
+	err := runHistory()
+	if err == nil {
+		t.Fatal("expected error for empty history")
+	}
+	if got := err.Error(); got != "no history yet — run a query first" {
+		t.Errorf("error = %q, want %q", got, "no history yet — run a query first")
+	}
+}
+
+func TestRunHistory_StoreCreationError(t *testing.T) {
+	orig := newHistoryStore
+	newHistoryStore = func() (*history.Store, error) {
+		return nil, fmt.Errorf("no home directory")
+	}
+	t.Cleanup(func() { newHistoryStore = orig })
+
+	err := runHistory()
+	if err == nil {
+		t.Fatal("expected error when store creation fails")
+	}
+	want := "failed to access history: no home directory"
+	if got := err.Error(); got != want {
+		t.Errorf("error = %q, want %q", got, want)
+	}
+}
+
+func TestFormatHistoryEntry(t *testing.T) {
+	ts := time.Date(2026, 2, 20, 14, 30, 0, 0, time.UTC)
+	entry := history.Entry{
+		Query:     "list running containers",
+		Selected:  "docker ps",
+		Timestamp: ts,
+	}
+
+	got := formatHistoryEntry(entry)
+	want := "[Feb 20 14:30] list running containers → docker ps"
+	if got != want {
+		t.Errorf("formatHistoryEntry() = %q, want %q", got, want)
+	}
+}
+
+func TestFormatHistoryEntry_LongQuery(t *testing.T) {
+	ts := time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC)
+	entry := history.Entry{
+		Query:     "find all files larger than 1GB and delete them",
+		Selected:  "find . -size +1G -delete",
+		Timestamp: ts,
+	}
+
+	got := formatHistoryEntry(entry)
+	want := "[Jan 05 09:00] find all files larger than 1GB and delete them → find . -size +1G -delete"
+	if got != want {
+		t.Errorf("formatHistoryEntry() = %q, want %q", got, want)
+	}
+}
+
 func TestSaveToHistory_EmptyPipeContext(t *testing.T) {
 	store := withTempHistoryStore(t)
 

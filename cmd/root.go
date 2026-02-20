@@ -29,6 +29,7 @@ var (
 	queryFlag        string
 	forceSend        bool
 	lastFlag         bool
+	historyFlag      bool
 )
 
 // ErrCancelled indicates user cancelled the operation.
@@ -58,6 +59,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
 	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
 	rootCmd.Flags().BoolVar(&lastFlag, "last", false, "show last selected command and open action menu")
+	rootCmd.Flags().BoolVar(&historyFlag, "history", false, "browse command history with interactive picker")
 }
 
 // Execute runs the root command
@@ -77,6 +79,10 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if lastFlag {
 		return runLast()
+	}
+
+	if historyFlag {
+		return runHistory()
 	}
 
 	pipeContext, err := readStdin()
@@ -165,6 +171,41 @@ func runLast() error {
 	}
 
 	return handleSelectedCommand(entry.Selected)
+}
+
+// runHistory loads all history entries and presents an interactive picker.
+func runHistory() error {
+	store, err := newHistoryStore()
+	if err != nil {
+		return fmt.Errorf("failed to access history: %w", err)
+	}
+
+	entries, err := store.List()
+	if err != nil {
+		return fmt.Errorf("failed to read history: %w", err)
+	}
+
+	if len(entries) == 0 {
+		return fmt.Errorf("no history yet — run a query first")
+	}
+
+	idx, err := picker.PickIndex(len(entries), func(i int) string {
+		return formatHistoryEntry(entries[i])
+	})
+	if err != nil {
+		if errors.Is(err, picker.ErrAborted) {
+			return ErrCancelled
+		}
+		return fmt.Errorf("failed to pick from history: %w", err)
+	}
+
+	return handleSelectedCommand(entries[idx].Selected)
+}
+
+// formatHistoryEntry formats a history entry for display in the picker.
+func formatHistoryEntry(e history.Entry) string {
+	ts := e.Timestamp.Format("Jan 02 15:04")
+	return fmt.Sprintf("[%s] %s → %s", ts, e.Query, e.Selected)
 }
 
 // generateCommands generates shell commands using LLM based on user query.
