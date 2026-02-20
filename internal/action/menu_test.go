@@ -270,3 +270,59 @@ func TestDispatchAction_Cancel(t *testing.T) {
 		t.Errorf("dispatchAction(ActionCancel) = %v, want ErrCancelled", err)
 	}
 }
+
+func TestReadKeypress_Revise(t *testing.T) {
+	for _, key := range []byte{'r', 'R'} {
+		r := bytes.NewReader([]byte{key})
+		act, err := readKeypress(r)
+		if err != nil {
+			t.Errorf("readKeypress(%q) returned error: %v", key, err)
+		}
+		if act != ActionRevise {
+			t.Errorf("readKeypress(%q) = %d, want ActionRevise(%d)", key, act, ActionRevise)
+		}
+	}
+}
+
+func TestDispatchAction_Revise(t *testing.T) {
+	err := dispatchAction(ActionRevise, "echo hello")
+	if err == nil {
+		t.Fatal("dispatchAction(ActionRevise) expected error, got nil")
+	}
+
+	var reviseErr *ReviseRequestedError
+	if !errors.As(err, &reviseErr) {
+		t.Fatalf("expected ReviseRequestedError, got %T: %v", err, err)
+	}
+	if reviseErr.Command != "echo hello" {
+		t.Errorf("ReviseRequestedError.Command = %q, want %q", reviseErr.Command, "echo hello")
+	}
+}
+
+func TestPromptActionWith_Revise(t *testing.T) {
+	// Redirect stderr to discard prompt output
+	origStderr := os.Stderr
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+	defer func() { _ = stderrR.Close() }()
+	os.Stderr = stderrW
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	input := bytes.NewReader([]byte{'r'})
+	promptErr := promptActionWith("echo hello", input)
+	_ = stderrW.Close()
+
+	if promptErr == nil {
+		t.Fatal("promptActionWith(\"echo hello\", 'r') expected error, got nil")
+	}
+
+	var reviseErr *ReviseRequestedError
+	if !errors.As(promptErr, &reviseErr) {
+		t.Fatalf("expected ReviseRequestedError, got %T: %v", promptErr, promptErr)
+	}
+	if reviseErr.Command != "echo hello" {
+		t.Errorf("ReviseRequestedError.Command = %q, want %q", reviseErr.Command, "echo hello")
+	}
+}
