@@ -127,8 +127,8 @@ All work is done in the existing branch `history-and-follow-up` (PR #31). Commit
 
 ### Task 6: Update documentation
 
-- [ ] update README.md — add revise option to post-selection actions section
-- [ ] update CLAUDE.md project overview if needed (action menu description)
+- [x] update README.md — add revise option to post-selection actions section
+- [x] update CLAUDE.md project overview if needed (action menu description)
 
 ## Technical Details
 
