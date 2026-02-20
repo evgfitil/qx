@@ -138,9 +138,9 @@ These features share a common storage layer: follow-up reads the latest history 
 
 ### Task 8: Update documentation
 
-- [ ] update README.md with new flags: `--last`, `--history`, `--continue`
-- [ ] add usage examples for each flag
-- [ ] update roadmap (`docs/plans/20260203-product-roadmap-research.md`) — mark History and Follow-up as implemented in checklist
+- [x] update README.md with new flags: `--last`, `--history`, `--continue`
+- [x] add usage examples for each flag
+- [x] update roadmap (`docs/plans/20260203-product-roadmap-research.md`) — mark History and Follow-up as implemented in checklist
 
 ## Technical Details
 
