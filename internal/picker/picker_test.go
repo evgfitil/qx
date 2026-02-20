@@ -34,9 +34,8 @@ func TestPickIndex_Empty(t *testing.T) {
 }
 
 func TestPickIndex_NegativeCount(t *testing.T) {
-	// Zero count should return error
-	_, err := PickIndex(0, func(i int) string { return "" })
+	_, err := PickIndex(-1, func(i int) string { return "" })
 	if err == nil {
-		t.Error("expected error for zero count")
+		t.Error("expected error for negative count")
 	}
 }

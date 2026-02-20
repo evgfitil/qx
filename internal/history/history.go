@@ -2,6 +2,7 @@ package history
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,7 +73,7 @@ func (s *Store) List() ([]Entry, error) {
 }
 
 // ErrEmpty is returned when history has no entries.
-var ErrEmpty = fmt.Errorf("history is empty")
+var ErrEmpty = errors.New("history is empty")
 
 func (s *Store) readAll() ([]Entry, error) {
 	data, err := os.ReadFile(s.filePath)
@@ -106,11 +107,12 @@ func (s *Store) writeAll(entries []Entry) error {
 	}
 
 	tmp := s.filePath + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return fmt.Errorf("writing history temp file: %w", err)
 	}
 
 	if err := os.Rename(tmp, s.filePath); err != nil {
+		_ = os.Remove(tmp)
 		return fmt.Errorf("renaming history temp file: %w", err)
 	}
 

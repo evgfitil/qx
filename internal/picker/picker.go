@@ -36,7 +36,7 @@ func Pick(commands []string) (string, error) {
 // display function and returns the selected index. Returns ErrAborted if
 // the user cancels selection.
 func PickIndex(n int, display func(i int) string) (int, error) {
-	if n == 0 {
+	if n <= 0 {
 		return -1, errors.New("no items to pick from")
 	}
 

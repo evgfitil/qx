@@ -231,3 +231,36 @@ func TestBuildMessages_WithFollowUp(t *testing.T) {
 		t.Errorf("message[3] = %q, want new query", msgs[3].Content)
 	}
 }
+
+func TestBuildMessages_WithFollowUpAndPipeContext(t *testing.T) {
+	followUp := &FollowUpContext{
+		PreviousQuery:   "stop nginx",
+		PreviousCommand: "docker stop abc123",
+	}
+	pipeContext := "CONTAINER ID\nabc123 nginx"
+	userMessage := "Context:\n<stdin>\n" + pipeContext + "\n</stdin>\n\nTask: also remove the volume"
+	msgs := buildMessages(3, pipeContext, userMessage, followUp)
+
+	if len(msgs) != 4 {
+		t.Fatalf("expected 4 messages, got %d", len(msgs))
+	}
+
+	// System prompt should contain both pipe and follow-up rules
+	sysContent := msgs[0].Content
+	if !strings.Contains(sysContent, "stdin context") {
+		t.Error("system prompt should contain pipe context rules")
+	}
+	if !strings.Contains(sysContent, "refining a previous command") {
+		t.Error("system prompt should contain follow-up rules")
+	}
+
+	if msgs[1].Content != "stop nginx" {
+		t.Errorf("message[1] = %q, want previous query", msgs[1].Content)
+	}
+	if msgs[2].Content != "docker stop abc123" {
+		t.Errorf("message[2] = %q, want previous command", msgs[2].Content)
+	}
+	if !strings.Contains(msgs[3].Content, "<stdin>") {
+		t.Error("message[3] should contain stdin wrapper for new query with pipe context")
+	}
+}

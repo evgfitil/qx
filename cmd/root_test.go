@@ -271,11 +271,9 @@ func TestRunLast_StoreCreationError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when store creation fails")
 	}
-	if !errors.Is(err, fmt.Errorf("")) {
-		// Just check error message contains the expected text
-		if got := err.Error(); got != "failed to access history: no home directory" {
-			t.Errorf("error = %q, want %q", got, "failed to access history: no home directory")
-		}
+	want := "failed to access history: no home directory"
+	if got := err.Error(); got != want {
+		t.Errorf("error = %q, want %q", got, want)
 	}
 }
 
@@ -381,6 +379,47 @@ func TestRunContinue_StoreCreationError(t *testing.T) {
 		t.Fatal("expected error when store creation fails")
 	}
 	want := "failed to access history: no home directory"
+	if got := err.Error(); got != want {
+		t.Errorf("error = %q, want %q", got, want)
+	}
+}
+
+func TestRun_ContinueWithoutQueryArg(t *testing.T) {
+	withTempHistoryStore(t)
+
+	origContinueFlag := continueFlag
+	continueFlag = true
+	t.Cleanup(func() { continueFlag = origContinueFlag })
+
+	err := run(rootCmd, []string{})
+	if err == nil {
+		t.Fatal("expected error for --continue without query")
+	}
+	want := "--continue requires a query argument"
+	if got := err.Error(); got != want {
+		t.Errorf("error = %q, want %q", got, want)
+	}
+}
+
+func TestRun_MutuallyExclusiveFlags(t *testing.T) {
+	origLast := lastFlag
+	origHistory := historyFlag
+	origContinue := continueFlag
+	t.Cleanup(func() {
+		lastFlag = origLast
+		historyFlag = origHistory
+		continueFlag = origContinue
+	})
+
+	lastFlag = true
+	historyFlag = true
+	continueFlag = false
+
+	err := run(rootCmd, []string{})
+	if err == nil {
+		t.Fatal("expected error for combined --last and --history")
+	}
+	want := "--last, --history, and --continue are mutually exclusive"
 	if got := err.Error(); got != want {
 		t.Errorf("error = %q, want %q", got, want)
 	}

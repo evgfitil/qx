@@ -79,6 +79,20 @@ func run(cmd *cobra.Command, args []string) error {
 		return handleShellIntegration(shellIntegration)
 	}
 
+	flagCount := 0
+	if lastFlag {
+		flagCount++
+	}
+	if historyFlag {
+		flagCount++
+	}
+	if continueFlag {
+		flagCount++
+	}
+	if flagCount > 1 {
+		return fmt.Errorf("--last, --history, and --continue are mutually exclusive")
+	}
+
 	if lastFlag {
 		return runLast()
 	}
