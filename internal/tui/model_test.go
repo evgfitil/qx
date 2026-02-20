@@ -801,40 +801,6 @@ func TestSelectedResult_QueryEmptyWhenNoQuerySubmitted(t *testing.T) {
 	}
 }
 
-func TestSelectedResult_ContainsCommandsList(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-	m.originalQuery = "list files"
-	m.commands = []string{"ls -la", "ls -lah", "find ."}
-	m.filtered = m.commands
-	m.state = stateSelect
-	m.cursor = 0
-
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model := updated.(Model)
-
-	result := model.Result()
-	selected, ok := result.(SelectedResult)
-	if !ok {
-		t.Fatal("expected SelectedResult")
-	}
-	if len(selected.Commands) != 3 {
-		t.Fatalf("Commands length = %d, want 3", len(selected.Commands))
-	}
-	want := []string{"ls -la", "ls -lah", "find ."}
-	for i, cmd := range selected.Commands {
-		if cmd != want[i] {
-			t.Errorf("Commands[%d] = %q, want %q", i, cmd, want[i])
-		}
-	}
-}
-
 func TestHandleEnter_PipeContextNoSecret(t *testing.T) {
 	cfg := llm.Config{
 		BaseURL: "http://localhost",

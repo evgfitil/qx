@@ -16,7 +16,6 @@ func tempStore(t *testing.T) *Store {
 func sampleEntry(query string) Entry {
 	return Entry{
 		Query:     query,
-		Commands:  []string{"cmd1", "cmd2"},
 		Selected:  "cmd1",
 		Timestamp: time.Now().Truncate(time.Millisecond),
 	}
@@ -94,7 +93,6 @@ func TestAdd_PipeContext(t *testing.T) {
 	s := tempStore(t)
 	entry := Entry{
 		Query:       "delete old files",
-		Commands:    []string{"find . -mtime +30 -delete"},
 		Selected:    "find . -mtime +30 -delete",
 		PipeContext: "ls -la output",
 		Timestamp:   time.Now(),

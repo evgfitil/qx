@@ -156,7 +156,6 @@ func runInteractive(initialQuery string, pipeContext string) error {
 		if r.Command != "" {
 			saveToHistory(history.Entry{
 				Query:       r.Query,
-				Commands:    r.Commands,
 				Selected:    r.Command,
 				PipeContext: pipeContext,
 				Timestamp:   time.Now(),
@@ -299,7 +298,6 @@ func generateCommands(query string, pipeContext string, followUp *llm.FollowUpCo
 	if selected != "" {
 		saveToHistory(history.Entry{
 			Query:       query,
-			Commands:    commands,
 			Selected:    selected,
 			PipeContext: pipeContext,
 			Timestamp:   time.Now(),

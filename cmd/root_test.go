@@ -149,7 +149,6 @@ func TestSaveToHistory_PersistsEntry(t *testing.T) {
 
 	entry := history.Entry{
 		Query:       "list files",
-		Commands:    []string{"ls -la", "ls -lah"},
 		Selected:    "ls -la",
 		PipeContext: "some context",
 		Timestamp:   time.Now(),
@@ -166,9 +165,6 @@ func TestSaveToHistory_PersistsEntry(t *testing.T) {
 	if got.Selected != "ls -la" {
 		t.Errorf("Selected = %q, want %q", got.Selected, "ls -la")
 	}
-	if len(got.Commands) != 2 {
-		t.Errorf("Commands length = %d, want 2", len(got.Commands))
-	}
 	if got.PipeContext != "some context" {
 		t.Errorf("PipeContext = %q, want %q", got.PipeContext, "some context")
 	}
@@ -180,7 +176,6 @@ func TestSaveToHistory_MultipleSaves(t *testing.T) {
 	for _, q := range []string{"first", "second", "third"} {
 		saveToHistory(history.Entry{
 			Query:     q,
-			Commands:  []string{"cmd1"},
 			Selected:  "cmd1",
 			Timestamp: time.Now(),
 		})
@@ -208,7 +203,6 @@ func TestSaveToHistory_StoreCreationError(t *testing.T) {
 	// Should not panic when store creation fails
 	saveToHistory(history.Entry{
 		Query:     "test",
-		Commands:  []string{"cmd"},
 		Selected:  "cmd",
 		Timestamp: time.Now(),
 	})
@@ -219,7 +213,6 @@ func TestRunLast_WithHistory(t *testing.T) {
 
 	_ = store.Add(history.Entry{
 		Query:     "find large files",
-		Commands:  []string{"find . -size +100M", "du -sh * | sort -rh"},
 		Selected:  "find . -size +100M",
 		Timestamp: time.Now(),
 	})
@@ -341,7 +334,6 @@ func TestSaveToHistory_EmptyPipeContext(t *testing.T) {
 
 	saveToHistory(history.Entry{
 		Query:     "list files",
-		Commands:  []string{"ls"},
 		Selected:  "ls",
 		Timestamp: time.Now(),
 	})
@@ -430,7 +422,6 @@ func TestRunContinue_WithHistory(t *testing.T) {
 
 	_ = store.Add(history.Entry{
 		Query:     "find large files",
-		Commands:  []string{"find . -size +100M", "du -sh * | sort -rh"},
 		Selected:  "find . -size +100M",
 		Timestamp: time.Now(),
 	})

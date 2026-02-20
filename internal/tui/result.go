@@ -15,9 +15,8 @@ func (CancelledResult) isResult() {}
 
 // SelectedResult indicates user selected a command.
 type SelectedResult struct {
-	Command  string
-	Query    string
-	Commands []string
+	Command string
+	Query   string
 }
 
 func (SelectedResult) isResult() {}

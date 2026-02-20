@@ -18,7 +18,6 @@ const (
 // Entry represents a single history record.
 type Entry struct {
 	Query       string    `json:"query"`
-	Commands    []string  `json:"commands"`
 	Selected    string    `json:"selected"`
 	PipeContext string    `json:"pipe_context,omitempty"`
 	Timestamp   time.Time `json:"timestamp"`
