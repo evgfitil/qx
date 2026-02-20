@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/evgfitil/qx/internal/action"
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/history"
+	"github.com/evgfitil/qx/internal/llm"
 )
 
 func TestErrCancelled_CanBeExtracted(t *testing.T) {
@@ -61,6 +63,8 @@ func TestGenerateCommands_EmptyPipeContextSkipsGuard(t *testing.T) {
 func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 	// When stdout is a pipe (non-TTY), handleSelectedCommand should print
 	// the command to stdout without showing the action menu.
+	withTempHistoryStore(t)
+
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("failed to create pipe: %v", err)
@@ -70,7 +74,7 @@ func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 	os.Stdout = w
 	t.Cleanup(func() { os.Stdout = origStdout })
 
-	handleErr := handleSelectedCommand("echo hello")
+	handleErr := handleSelectedCommand("echo hello", "test query", "")
 	_ = w.Close()
 
 	if handleErr != nil {
@@ -110,6 +114,8 @@ func TestRunInteractive_SimpleQueryDoesNotPanic(t *testing.T) {
 
 func TestHandleSelectedCommand_NonTTY_EmptyCommand(t *testing.T) {
 	// Even with empty command, non-TTY path should print and return nil.
+	withTempHistoryStore(t)
+
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("failed to create pipe: %v", err)
@@ -119,7 +125,7 @@ func TestHandleSelectedCommand_NonTTY_EmptyCommand(t *testing.T) {
 	os.Stdout = w
 	t.Cleanup(func() { os.Stdout = origStdout })
 
-	handleErr := handleSelectedCommand("")
+	handleErr := handleSelectedCommand("", "test query", "")
 	_ = w.Close()
 
 	if handleErr != nil {
@@ -438,5 +444,189 @@ func TestRunContinue_WithHistory(t *testing.T) {
 	// The error should come from config.Load(), not from history access
 	if got := err.Error(); got == "no history yet — run a query first" {
 		t.Error("should not get empty history error when history has entries")
+	}
+}
+
+// withMockFns saves and restores overridable function references used by
+// handleSelectedCommand. Call at the start of any test that overrides them.
+func withMockFns(t *testing.T) {
+	t.Helper()
+	origShouldPrompt := shouldPromptFn
+	origPromptAction := promptActionFn
+	origReadRefinement := readRefinementFn
+	origGenerateCommands := generateCommandsFn
+	t.Cleanup(func() {
+		shouldPromptFn = origShouldPrompt
+		promptActionFn = origPromptAction
+		readRefinementFn = origReadRefinement
+		generateCommandsFn = origGenerateCommands
+	})
+}
+
+func TestHandleSelectedCommand_Revise_FollowUpContext(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	shouldPromptFn = func() bool { return true }
+	promptActionFn = func(cmd string) error {
+		return &action.ReviseRequestedError{Command: cmd}
+	}
+	readRefinementFn = func() (string, error) {
+		return "make it recursive", nil
+	}
+
+	var capturedQuery string
+	var capturedPipeContext string
+	var capturedFollowUp *llm.FollowUpContext
+	generateCommandsFn = func(query string, pipeContext string, followUp *llm.FollowUpContext) error {
+		capturedQuery = query
+		capturedPipeContext = pipeContext
+		capturedFollowUp = followUp
+		return nil
+	}
+
+	err := handleSelectedCommand("find .", "find files", "some context")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if capturedQuery != "make it recursive" {
+		t.Errorf("query = %q, want %q", capturedQuery, "make it recursive")
+	}
+	if capturedPipeContext != "some context" {
+		t.Errorf("pipeContext = %q, want %q", capturedPipeContext, "some context")
+	}
+	if capturedFollowUp == nil {
+		t.Fatal("followUp is nil")
+	}
+	if capturedFollowUp.PreviousQuery != "find files" {
+		t.Errorf("PreviousQuery = %q, want %q", capturedFollowUp.PreviousQuery, "find files")
+	}
+	if capturedFollowUp.PreviousCommand != "find ." {
+		t.Errorf("PreviousCommand = %q, want %q", capturedFollowUp.PreviousCommand, "find .")
+	}
+
+	// No history should be saved on revise (intermediate step)
+	entries, _ := store.List()
+	if len(entries) != 0 {
+		t.Errorf("expected 0 history entries on revise, got %d", len(entries))
+	}
+}
+
+func TestHandleSelectedCommand_Revise_EmptyRefinement(t *testing.T) {
+	withMockFns(t)
+
+	shouldPromptFn = func() bool { return true }
+	promptActionFn = func(cmd string) error {
+		return &action.ReviseRequestedError{Command: cmd}
+	}
+	readRefinementFn = func() (string, error) {
+		return "", action.ErrEmptyRefinement
+	}
+
+	err := handleSelectedCommand("find .", "find files", "")
+	if !errors.Is(err, ErrCancelled) {
+		t.Errorf("expected ErrCancelled, got %v", err)
+	}
+}
+
+func TestHandleSelectedCommand_Revise_ReadError(t *testing.T) {
+	withMockFns(t)
+
+	shouldPromptFn = func() bool { return true }
+	promptActionFn = func(cmd string) error {
+		return &action.ReviseRequestedError{Command: cmd}
+	}
+	readRefinementFn = func() (string, error) {
+		return "", fmt.Errorf("failed to read from tty")
+	}
+
+	err := handleSelectedCommand("find .", "find files", "")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if got := err.Error(); got != "failed to read from tty" {
+		t.Errorf("error = %q, want %q", got, "failed to read from tty")
+	}
+}
+
+func TestHandleSelectedCommand_Revise_HistorySavedOnFinalAction(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	callCount := 0
+	shouldPromptFn = func() bool { return true }
+	promptActionFn = func(cmd string) error {
+		callCount++
+		if callCount == 1 {
+			return &action.ReviseRequestedError{Command: cmd}
+		}
+		// Simulate quit: print command, return nil
+		fmt.Println(cmd)
+		return nil
+	}
+	readRefinementFn = func() (string, error) {
+		return "make it recursive", nil
+	}
+	generateCommandsFn = func(query string, pipeContext string, followUp *llm.FollowUpContext) error {
+		// Simulate the second pick: call handleSelectedCommand with new command
+		return handleSelectedCommand("find . -r", query, pipeContext)
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("find .", "find files", "ctx")
+	_ = w.Close()
+	_, _ = io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// History should be saved once (for the final selection only)
+	entries, _ := store.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(entries))
+	}
+	if entries[0].Query != "make it recursive" {
+		t.Errorf("Query = %q, want %q", entries[0].Query, "make it recursive")
+	}
+	if entries[0].Selected != "find . -r" {
+		t.Errorf("Selected = %q, want %q", entries[0].Selected, "find . -r")
+	}
+	if entries[0].PipeContext != "ctx" {
+		t.Errorf("PipeContext = %q, want %q", entries[0].PipeContext, "ctx")
+	}
+}
+
+func TestHandleSelectedCommand_NonTTY_SavesHistory(t *testing.T) {
+	store := withTempHistoryStore(t)
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	_ = handleSelectedCommand("echo hello", "greet", "pipe data")
+	_ = w.Close()
+	_, _ = io.ReadAll(r)
+	_ = r.Close()
+
+	entries, _ := store.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(entries))
+	}
+	if entries[0].Query != "greet" {
+		t.Errorf("Query = %q, want %q", entries[0].Query, "greet")
+	}
+	if entries[0].Selected != "echo hello" {
+		t.Errorf("Selected = %q, want %q", entries[0].Selected, "echo hello")
+	}
+	if entries[0].PipeContext != "pipe data" {
+		t.Errorf("PipeContext = %q, want %q", entries[0].PipeContext, "pipe data")
 	}
 }

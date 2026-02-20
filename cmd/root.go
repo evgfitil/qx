@@ -36,6 +36,14 @@ var (
 // ErrCancelled indicates user cancelled the operation.
 var ErrCancelled = errors.New("operation cancelled")
 
+// Overridable function references for testing.
+var (
+	shouldPromptFn     = action.ShouldPrompt
+	promptActionFn     = action.PromptAction
+	readRefinementFn   = action.ReadRefinement
+	generateCommandsFn func(query string, pipeContext string, followUp *llm.FollowUpContext) error
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "qx [query]",
 	Short: "Generate shell commands using LLM",
@@ -55,6 +63,8 @@ Pipe command output into qx to provide context for more precise command generati
 }
 
 func init() {
+	generateCommandsFn = generateCommands
+
 	rootCmd.Flags().StringVar(&shellIntegration, "shell-integration", "", "output shell integration script (bash|zsh|fish)")
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
@@ -154,13 +164,7 @@ func runInteractive(initialQuery string, pipeContext string) error {
 		return ErrCancelled
 	case tui.SelectedResult:
 		if r.Command != "" {
-			saveToHistory(history.Entry{
-				Query:       r.Query,
-				Selected:    r.Command,
-				PipeContext: pipeContext,
-				Timestamp:   time.Now(),
-			})
-			return handleSelectedCommand(r.Command)
+			return handleSelectedCommand(r.Command, r.Query, pipeContext)
 		}
 		return nil
 	default:
@@ -192,7 +196,7 @@ func runLast() error {
 		return fmt.Errorf("failed to read history: %w", err)
 	}
 
-	return handleSelectedCommand(entry.Selected)
+	return handleSelectedCommand(entry.Selected, entry.Query, entry.PipeContext)
 }
 
 // runHistory loads all history entries and presents an interactive picker.
@@ -221,7 +225,7 @@ func runHistory() error {
 		return fmt.Errorf("failed to pick from history: %w", err)
 	}
 
-	return handleSelectedCommand(entries[idx].Selected)
+	return handleSelectedCommand(entries[idx].Selected, entries[idx].Query, entries[idx].PipeContext)
 }
 
 // runContinue loads the last history entry and uses it as follow-up context
@@ -296,13 +300,7 @@ func generateCommands(query string, pipeContext string, followUp *llm.FollowUpCo
 	}
 
 	if selected != "" {
-		saveToHistory(history.Entry{
-			Query:       query,
-			Selected:    selected,
-			PipeContext: pipeContext,
-			Timestamp:   time.Now(),
-		})
-		return handleSelectedCommand(selected)
+		return handleSelectedCommand(selected, query, pipeContext)
 	}
 
 	return nil
@@ -330,14 +328,47 @@ func saveToHistory(entry history.Entry) {
 
 // handleSelectedCommand either shows the post-selection action menu (when
 // stdout is a TTY) or prints the command to stdout (when redirected).
-func handleSelectedCommand(command string) error {
-	if action.ShouldPrompt() {
-		err := action.PromptAction(command)
-		if errors.Is(err, action.ErrCancelled) {
-			return ErrCancelled
-		}
-		return err
+// When the user chooses "revise", it reads a refinement query and starts
+// a new generation cycle with follow-up context. History is saved only
+// on the final action (execute/copy/quit), not on intermediate revisions.
+func handleSelectedCommand(command, query, pipeContext string) error {
+	if !shouldPromptFn() {
+		saveToHistory(history.Entry{
+			Query:       query,
+			Selected:    command,
+			PipeContext: pipeContext,
+			Timestamp:   time.Now(),
+		})
+		fmt.Println(command)
+		return nil
 	}
-	fmt.Println(command)
-	return nil
+
+	err := promptActionFn(command)
+	if errors.Is(err, action.ErrCancelled) {
+		return ErrCancelled
+	}
+
+	var reviseErr *action.ReviseRequestedError
+	if errors.As(err, &reviseErr) {
+		refinement, readErr := readRefinementFn()
+		if readErr != nil {
+			if errors.Is(readErr, action.ErrEmptyRefinement) {
+				return ErrCancelled
+			}
+			return readErr
+		}
+		followUp := &llm.FollowUpContext{
+			PreviousQuery:   query,
+			PreviousCommand: command,
+		}
+		return generateCommandsFn(refinement, pipeContext, followUp)
+	}
+
+	saveToHistory(history.Entry{
+		Query:       query,
+		Selected:    command,
+		PipeContext: pipeContext,
+		Timestamp:   time.Now(),
+	})
+	return err
 }
