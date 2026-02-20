@@ -22,7 +22,8 @@ const (
 
 // Config represents the application configuration
 type Config struct {
-	LLM LLMConfig `mapstructure:"llm"`
+	LLM        LLMConfig `mapstructure:"llm"`
+	ActionMenu bool      `mapstructure:"action_menu"`
 }
 
 // LLMConfig contains LLM-related configuration
@@ -59,6 +60,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("llm.base_url", DefaultBaseURL)
 	viper.SetDefault("llm.model", DefaultModel)
 	viper.SetDefault("llm.count", DefaultCount)
+	viper.SetDefault("action_menu", false)
 
 	viper.MustBindEnv("llm.apikey", "OPENAI_API_KEY")
 
@@ -93,6 +95,38 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// Preferences holds user preferences that can be read without full config validation.
+// Used by paths like --last and --history that don't need LLM configuration.
+type Preferences struct {
+	ActionMenu bool `mapstructure:"action_menu"`
+}
+
+// LoadPreferences reads only user preferences from the config file.
+// It does not validate LLM fields or require an API key.
+// Returns zero-value Preferences on any failure.
+func LoadPreferences() Preferences {
+	v := viper.New()
+	v.SetDefault("action_menu", false)
+
+	path, err := configPath()
+	if err != nil {
+		return Preferences{}
+	}
+
+	v.SetConfigFile(path)
+	v.SetConfigType("yaml")
+
+	if err := v.ReadInConfig(); err != nil {
+		return Preferences{}
+	}
+
+	var prefs Preferences
+	if err := v.Unmarshal(&prefs); err != nil {
+		return Preferences{}
+	}
+	return prefs
 }
 
 // Path returns the path to the config file
