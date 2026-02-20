@@ -400,7 +400,10 @@ func TestRun_ContinueWithoutQueryArg(t *testing.T) {
 	}
 }
 
-func TestRun_MutuallyExclusiveFlags(t *testing.T) {
+// resetCmdFlags resets flag state after cobra.Execute() to avoid polluting
+// other tests. Cobra marks flags as Changed when parsed via SetArgs/Execute.
+func resetCmdFlags(t *testing.T) {
+	t.Helper()
 	origLast := lastFlag
 	origHistory := historyFlag
 	origContinue := continueFlag
@@ -408,19 +411,67 @@ func TestRun_MutuallyExclusiveFlags(t *testing.T) {
 		lastFlag = origLast
 		historyFlag = origHistory
 		continueFlag = origContinue
+		for _, name := range []string{"last", "history", "continue"} {
+			if f := rootCmd.Flags().Lookup(name); f != nil {
+				f.Changed = false
+			}
+		}
+		rootCmd.SetArgs(nil)
 	})
+}
 
-	lastFlag = true
-	historyFlag = true
-	continueFlag = false
-
-	err := run(rootCmd, []string{})
-	if err == nil {
-		t.Fatal("expected error for combined --last and --history")
+func TestShortFlags_Registered(t *testing.T) {
+	tests := []struct {
+		long  string
+		short string
+	}{
+		{"last", "l"},
+		{"continue", "c"},
 	}
-	want := "--last, --history, and --continue are mutually exclusive"
-	if got := err.Error(); got != want {
-		t.Errorf("error = %q, want %q", got, want)
+	for _, tt := range tests {
+		f := rootCmd.Flags().Lookup(tt.long)
+		if f == nil {
+			t.Errorf("flag %q not found", tt.long)
+			continue
+		}
+		if f.Shorthand != tt.short {
+			t.Errorf("flag %q shorthand = %q, want %q", tt.long, f.Shorthand, tt.short)
+		}
+	}
+}
+
+func TestShortFlags_HistoryHasNoShorthand(t *testing.T) {
+	f := rootCmd.Flags().Lookup("history")
+	if f == nil {
+		t.Fatal("flag \"history\" not found")
+	}
+	if f.Shorthand != "" {
+		t.Errorf("history flag should have no shorthand, got %q", f.Shorthand)
+	}
+}
+
+func TestRun_MutuallyExclusiveFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"last_and_history", []string{"--last", "--history"}},
+		{"short_last_and_history", []string{"-l", "--history"}},
+		{"last_and_continue", []string{"--last", "--continue", "query"}},
+		{"short_last_and_short_continue", []string{"-l", "-c", "query"}},
+		{"history_and_continue", []string{"--history", "--continue", "query"}},
+		{"all_three", []string{"--last", "--history", "--continue", "query"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetCmdFlags(t)
+
+			rootCmd.SetArgs(tt.args)
+			err := rootCmd.Execute()
+			if err == nil {
+				t.Fatal("expected error for mutually exclusive flags")
+			}
+		})
 	}
 }
 
