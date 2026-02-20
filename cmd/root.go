@@ -31,6 +31,7 @@ var (
 	lastFlag         bool
 	historyFlag      bool
 	continueFlag     bool
+	actionMenuEnabled bool
 )
 
 // ErrCancelled indicates user cancelled the operation.
@@ -38,10 +39,11 @@ var ErrCancelled = errors.New("operation cancelled")
 
 // Overridable function references for testing.
 var (
-	shouldPromptFn     = action.ShouldPrompt
-	promptActionFn     = action.PromptAction
-	readRefinementFn   = action.ReadRefinement
-	generateCommandsFn func(query string, pipeContext string, followUp *llm.FollowUpContext) error
+	shouldPromptFn       = action.ShouldPrompt
+	shouldPromptStderrFn = action.ShouldPromptStderr
+	promptActionFn       = action.PromptAction
+	readRefinementFn     = action.ReadRefinement
+	generateCommandsFn   func(query string, pipeContext string, followUp *llm.FollowUpContext) error
 )
 
 var rootCmd = &cobra.Command{
@@ -90,6 +92,9 @@ func run(cmd *cobra.Command, args []string) error {
 	if shellIntegration != "" {
 		return handleShellIntegration(shellIntegration)
 	}
+
+	prefs := config.LoadPreferences()
+	actionMenuEnabled = prefs.ActionMenu
 
 	if lastFlag {
 		return runLast()
@@ -320,7 +325,12 @@ func saveToHistory(entry history.Entry) {
 // a new generation cycle with follow-up context. History is saved only
 // on the final action (execute/copy/quit), not on intermediate revisions.
 func handleSelectedCommand(command, query, pipeContext string) error {
-	if !shouldPromptFn() {
+	showMenu := shouldPromptFn()
+	if !showMenu && actionMenuEnabled {
+		showMenu = shouldPromptStderrFn()
+	}
+
+	if !showMenu {
 		saveToHistory(history.Entry{
 			Query:       query,
 			Selected:    command,

@@ -508,14 +508,18 @@ func TestRunContinue_WithHistory(t *testing.T) {
 func withMockFns(t *testing.T) {
 	t.Helper()
 	origShouldPrompt := shouldPromptFn
+	origShouldPromptStderr := shouldPromptStderrFn
 	origPromptAction := promptActionFn
 	origReadRefinement := readRefinementFn
 	origGenerateCommands := generateCommandsFn
+	origActionMenuEnabled := actionMenuEnabled
 	t.Cleanup(func() {
 		shouldPromptFn = origShouldPrompt
+		shouldPromptStderrFn = origShouldPromptStderr
 		promptActionFn = origPromptAction
 		readRefinementFn = origReadRefinement
 		generateCommandsFn = origGenerateCommands
+		actionMenuEnabled = origActionMenuEnabled
 	})
 }
 
@@ -725,5 +729,131 @@ func TestHandleSelectedCommand_TTY_ActionErrorSavesHistory(t *testing.T) {
 	}
 	if entries[0].Selected != "bad-cmd" {
 		t.Errorf("Selected = %q, want %q", entries[0].Selected, "bad-cmd")
+	}
+}
+
+func TestHandleSelectedCommand_ActionMenuEnabled_StdoutPipe_StderrTTY(t *testing.T) {
+	// When action_menu is enabled, stdout is a pipe, and stderr is a TTY,
+	// the action menu should be shown (shell integration mode).
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	actionMenuEnabled = true
+	shouldPromptFn = func() bool { return false }       // stdout is pipe
+	shouldPromptStderrFn = func() bool { return true }  // stderr is TTY
+
+	var menuShown bool
+	promptActionFn = func(cmd string) error {
+		menuShown = true
+		fmt.Println(cmd) // simulate quit action
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	_ = w.Close()
+	_, _ = io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !menuShown {
+		t.Error("expected action menu to be shown when action_menu enabled and stderr is TTY")
+	}
+}
+
+func TestHandleSelectedCommand_ActionMenuEnabled_StdoutPipe_StderrPipe(t *testing.T) {
+	// When action_menu is enabled but both stdout and stderr are pipes,
+	// the command should be printed to stdout without the menu.
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	actionMenuEnabled = true
+	shouldPromptFn = func() bool { return false }       // stdout is pipe
+	shouldPromptStderrFn = func() bool { return false } // stderr is also pipe
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	_ = w.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if string(out) != "echo hello\n" {
+		t.Errorf("output = %q, want %q", string(out), "echo hello\n")
+	}
+}
+
+func TestHandleSelectedCommand_ActionMenuDisabled_DefaultBehavior(t *testing.T) {
+	// When action_menu is disabled (default), non-TTY stdout should print
+	// command directly, regardless of stderr state.
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	actionMenuEnabled = false
+	shouldPromptFn = func() bool { return false }      // stdout is pipe
+	shouldPromptStderrFn = func() bool { return true } // stderr is TTY (shouldn't matter)
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	_ = w.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if string(out) != "echo hello\n" {
+		t.Errorf("output = %q, want %q", string(out), "echo hello\n")
+	}
+}
+
+func TestHandleSelectedCommand_ActionMenuEnabled_StdoutTTY(t *testing.T) {
+	// When stdout IS a TTY, action menu shows regardless of actionMenuEnabled.
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	actionMenuEnabled = false
+	shouldPromptFn = func() bool { return true } // stdout is TTY
+
+	var menuShown bool
+	promptActionFn = func(cmd string) error {
+		menuShown = true
+		fmt.Println(cmd)
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	_ = w.Close()
+	_, _ = io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !menuShown {
+		t.Error("expected action menu to be shown when stdout is TTY")
 	}
 }

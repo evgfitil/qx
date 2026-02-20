@@ -28,6 +28,24 @@ func TestShouldPrompt_WithPipe(t *testing.T) {
 	}
 }
 
+func TestShouldPromptStderr_WithPipe(t *testing.T) {
+	// When stderr is redirected to a pipe, ShouldPromptStderr should return false.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+	defer func() { _ = w.Close() }()
+
+	origStderr := os.Stderr
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	if ShouldPromptStderr() {
+		t.Error("ShouldPromptStderr() = true for pipe stderr, want false")
+	}
+}
+
 func TestReadKeypress_Execute(t *testing.T) {
 	for _, key := range []byte{'e', 'E'} {
 		r := bytes.NewReader([]byte{key})
