@@ -88,11 +88,11 @@ These features share a common storage layer: follow-up reads the latest history 
 
 ### Task 3: Save to history after command selection
 
-- [ ] initialize `history.Store` in `cmd/root.go` using config dir path
-- [ ] after successful command selection in `runInteractive()`, save entry with query, all commands, selected command, and pipe context
-- [ ] after successful command selection in non-interactive path, save entry similarly
-- [ ] write tests for save-on-selection flow (mock or use temp dir)
-- [ ] run tests — must pass before next task
+- [x] initialize `history.Store` in `cmd/root.go` using config dir path
+- [x] after successful command selection in `runInteractive()`, save entry with query, all commands, selected command, and pipe context
+- [x] after successful command selection in non-interactive path, save entry similarly
+- [x] write tests for save-on-selection flow (mock or use temp dir)
+- [x] run tests — must pass before next task
 
 ### Task 4: Implement --last flag
 

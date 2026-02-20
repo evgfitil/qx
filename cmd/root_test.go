@@ -6,8 +6,10 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/evgfitil/qx/internal/guard"
+	"github.com/evgfitil/qx/internal/history"
 )
 
 func TestErrCancelled_CanBeExtracted(t *testing.T) {
@@ -129,5 +131,104 @@ func TestHandleSelectedCommand_NonTTY_EmptyCommand(t *testing.T) {
 
 	if string(out) != "\n" {
 		t.Errorf("handleSelectedCommand output = %q, want %q", string(out), "\n")
+	}
+}
+
+func withTempHistoryStore(t *testing.T) *history.Store {
+	t.Helper()
+	dir := t.TempDir()
+	store := history.NewStore(dir)
+	orig := newHistoryStore
+	newHistoryStore = func() (*history.Store, error) { return store, nil }
+	t.Cleanup(func() { newHistoryStore = orig })
+	return store
+}
+
+func TestSaveToHistory_PersistsEntry(t *testing.T) {
+	store := withTempHistoryStore(t)
+
+	entry := history.Entry{
+		Query:       "list files",
+		Commands:    []string{"ls -la", "ls -lah"},
+		Selected:    "ls -la",
+		PipeContext: "some context",
+		Timestamp:   time.Now(),
+	}
+	saveToHistory(entry)
+
+	got, err := store.Last()
+	if err != nil {
+		t.Fatalf("Last() error = %v", err)
+	}
+	if got.Query != "list files" {
+		t.Errorf("Query = %q, want %q", got.Query, "list files")
+	}
+	if got.Selected != "ls -la" {
+		t.Errorf("Selected = %q, want %q", got.Selected, "ls -la")
+	}
+	if len(got.Commands) != 2 {
+		t.Errorf("Commands length = %d, want 2", len(got.Commands))
+	}
+	if got.PipeContext != "some context" {
+		t.Errorf("PipeContext = %q, want %q", got.PipeContext, "some context")
+	}
+}
+
+func TestSaveToHistory_MultipleSaves(t *testing.T) {
+	store := withTempHistoryStore(t)
+
+	for _, q := range []string{"first", "second", "third"} {
+		saveToHistory(history.Entry{
+			Query:     q,
+			Commands:  []string{"cmd1"},
+			Selected:  "cmd1",
+			Timestamp: time.Now(),
+		})
+	}
+
+	entries, err := store.List()
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("got %d entries, want 3", len(entries))
+	}
+	if entries[0].Query != "third" {
+		t.Errorf("newest entry = %q, want %q", entries[0].Query, "third")
+	}
+}
+
+func TestSaveToHistory_StoreCreationError(t *testing.T) {
+	orig := newHistoryStore
+	newHistoryStore = func() (*history.Store, error) {
+		return nil, fmt.Errorf("no home directory")
+	}
+	t.Cleanup(func() { newHistoryStore = orig })
+
+	// Should not panic when store creation fails
+	saveToHistory(history.Entry{
+		Query:     "test",
+		Commands:  []string{"cmd"},
+		Selected:  "cmd",
+		Timestamp: time.Now(),
+	})
+}
+
+func TestSaveToHistory_EmptyPipeContext(t *testing.T) {
+	store := withTempHistoryStore(t)
+
+	saveToHistory(history.Entry{
+		Query:     "list files",
+		Commands:  []string{"ls"},
+		Selected:  "ls",
+		Timestamp: time.Now(),
+	})
+
+	got, err := store.Last()
+	if err != nil {
+		t.Fatalf("Last() error = %v", err)
+	}
+	if got.PipeContext != "" {
+		t.Errorf("PipeContext = %q, want empty", got.PipeContext)
 	}
 }

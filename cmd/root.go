@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/evgfitil/qx/internal/action"
 	"github.com/evgfitil/qx/internal/config"
 	"github.com/evgfitil/qx/internal/guard"
+	"github.com/evgfitil/qx/internal/history"
 	"github.com/evgfitil/qx/internal/llm"
 	"github.com/evgfitil/qx/internal/picker"
 	"github.com/evgfitil/qx/internal/shell"
@@ -115,6 +119,13 @@ func runInteractive(initialQuery string, pipeContext string) error {
 		return ErrCancelled
 	case tui.SelectedResult:
 		if r.Command != "" {
+			saveToHistory(history.Entry{
+				Query:       r.Query,
+				Commands:    r.Commands,
+				Selected:    r.Command,
+				PipeContext: pipeContext,
+				Timestamp:   time.Now(),
+			})
 			return handleSelectedCommand(r.Command)
 		}
 		return nil
@@ -174,10 +185,37 @@ func generateCommands(query string, pipeContext string) error {
 	}
 
 	if selected != "" {
+		saveToHistory(history.Entry{
+			Query:       query,
+			Commands:    commands,
+			Selected:    selected,
+			PipeContext: pipeContext,
+			Timestamp:   time.Now(),
+		})
 		return handleSelectedCommand(selected)
 	}
 
 	return nil
+}
+
+// newHistoryStore creates a history store using the default config directory.
+// Overridden in tests to use a temp directory.
+var newHistoryStore = func() (*history.Store, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	return history.NewStore(filepath.Join(home, config.Dir)), nil
+}
+
+// saveToHistory persists a history entry. Errors are silently ignored
+// because history is a convenience feature that should not break the main flow.
+func saveToHistory(entry history.Entry) {
+	store, err := newHistoryStore()
+	if err != nil {
+		return
+	}
+	_ = store.Add(entry)
 }
 
 // handleSelectedCommand either shows the post-selection action menu (when
