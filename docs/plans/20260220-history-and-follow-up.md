@@ -79,12 +79,12 @@ These features share a common storage layer: follow-up reads the latest history 
 
 ### Task 2: Propagate query through SelectedResult
 
-- [ ] add `Query string` field to `SelectedResult` in `internal/tui/result.go`
-- [ ] set `Query` from `m.originalQuery` when constructing `SelectedResult` in `internal/tui/model.go`
-- [ ] update `cmd/root.go` non-interactive path (`generateCommands`) — propagate query alongside selected command
-- [ ] verify existing tests pass with the new field
-- [ ] write tests for `SelectedResult` query propagation
-- [ ] run tests — must pass before next task
+- [x] add `Query string` field to `SelectedResult` in `internal/tui/result.go`
+- [x] set `Query` from `m.originalQuery` when constructing `SelectedResult` in `internal/tui/model.go`
+- [x] update `cmd/root.go` non-interactive path (`generateCommands`) — propagate query alongside selected command
+- [x] verify existing tests pass with the new field
+- [x] write tests for `SelectedResult` query propagation
+- [x] run tests — must pass before next task
 
 ### Task 3: Save to history after command selection
 

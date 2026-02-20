@@ -287,7 +287,7 @@ func (m Model) View() string {
 // Returns SelectedResult if a command was selected, CancelledResult otherwise.
 func (m Model) Result() Result {
 	if m.selected != "" {
-		return SelectedResult{Command: m.selected}
+		return SelectedResult{Command: m.selected, Query: m.originalQuery}
 	}
 	// In select/loading states, textArea may contain filter text or still has query,
 	// but originalQuery always has the submitted query
