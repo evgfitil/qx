@@ -114,15 +114,15 @@ These features share a common storage layer: follow-up reads the latest history 
 
 ### Task 6: Implement --continue flag with follow-up context
 
-- [ ] add `--continue` flag to cobra command in `cmd/root.go`
-- [ ] extend `Provider` interface: add `previousQuery string` and `previousCommand string` parameters to `Generate()`, or add a `FollowUpContext` struct parameter
-- [ ] in `internal/llm/base.go`, when follow-up context is present: build messages as `[system, user(prev query), assistant(prev command), user(new query)]` instead of `[system, user(query)]`
-- [ ] in `internal/llm/prompt.go`, extend `SystemPrompt()` to include follow-up rules when in continue mode (e.g., "refine the previous command based on user's new request")
-- [ ] in `cmd/root.go`, when `--continue` is set: load `Store.Last()`, pass previous context through to `Generate()`
-- [ ] handle empty history — print informative error message
-- [ ] write tests for follow-up prompt construction (verify message structure)
-- [ ] write tests for system prompt follow-up rules
-- [ ] run tests — must pass before next task
+- [x] add `--continue` flag to cobra command in `cmd/root.go`
+- [x] extend `Provider` interface: add `previousQuery string` and `previousCommand string` parameters to `Generate()`, or add a `FollowUpContext` struct parameter
+- [x] in `internal/llm/base.go`, when follow-up context is present: build messages as `[system, user(prev query), assistant(prev command), user(new query)]` instead of `[system, user(query)]`
+- [x] in `internal/llm/prompt.go`, extend `SystemPrompt()` to include follow-up rules when in continue mode (e.g., "refine the previous command based on user's new request")
+- [x] in `cmd/root.go`, when `--continue` is set: load `Store.Last()`, pass previous context through to `Generate()`
+- [x] handle empty history — print informative error message
+- [x] write tests for follow-up prompt construction (verify message structure)
+- [x] write tests for system prompt follow-up rules
+- [x] run tests — must pass before next task
 
 ### Task 7: Verify acceptance criteria
 

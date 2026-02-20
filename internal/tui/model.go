@@ -307,7 +307,7 @@ func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd 
 		ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
 		defer cancel()
 
-		commands, err := provider.Generate(ctx, query, cfg.Count, pipeContext)
+		commands, err := provider.Generate(ctx, query, cfg.Count, pipeContext, nil)
 		if err != nil {
 			return commandsMsg{err: err}
 		}

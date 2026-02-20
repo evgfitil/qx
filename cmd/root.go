@@ -30,6 +30,7 @@ var (
 	forceSend        bool
 	lastFlag         bool
 	historyFlag      bool
+	continueFlag     bool
 )
 
 // ErrCancelled indicates user cancelled the operation.
@@ -60,6 +61,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
 	rootCmd.Flags().BoolVar(&lastFlag, "last", false, "show last selected command and open action menu")
 	rootCmd.Flags().BoolVar(&historyFlag, "history", false, "browse command history with interactive picker")
+	rootCmd.Flags().BoolVar(&continueFlag, "continue", false, "refine the last command with a new query")
 }
 
 // Execute runs the root command
@@ -96,12 +98,19 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if continueFlag {
+		if len(args) == 0 {
+			return fmt.Errorf("--continue requires a query argument")
+		}
+		return runContinue(args[0], pipeContext)
+	}
+
 	if len(args) == 0 {
 		return runInteractive(queryFlag, pipeContext)
 	}
 
 	query := args[0]
-	return generateCommands(query, pipeContext)
+	return generateCommands(query, pipeContext, nil)
 }
 
 func runInteractive(initialQuery string, pipeContext string) error {
@@ -202,6 +211,30 @@ func runHistory() error {
 	return handleSelectedCommand(entries[idx].Selected)
 }
 
+// runContinue loads the last history entry and uses it as follow-up context
+// for refining the previous command with a new query.
+func runContinue(query string, pipeContext string) error {
+	store, err := newHistoryStore()
+	if err != nil {
+		return fmt.Errorf("failed to access history: %w", err)
+	}
+
+	entry, err := store.Last()
+	if err != nil {
+		if errors.Is(err, history.ErrEmpty) {
+			return fmt.Errorf("no history yet — run a query first")
+		}
+		return fmt.Errorf("failed to read history: %w", err)
+	}
+
+	followUp := &llm.FollowUpContext{
+		PreviousQuery:   entry.Query,
+		PreviousCommand: entry.Selected,
+	}
+
+	return generateCommands(query, pipeContext, followUp)
+}
+
 // formatHistoryEntry formats a history entry for display in the picker.
 func formatHistoryEntry(e history.Entry) string {
 	ts := e.Timestamp.Format("Jan 02 15:04")
@@ -209,7 +242,7 @@ func formatHistoryEntry(e history.Entry) string {
 }
 
 // generateCommands generates shell commands using LLM based on user query.
-func generateCommands(query string, pipeContext string) error {
+func generateCommands(query string, pipeContext string, followUp *llm.FollowUpContext) error {
 	if err := guard.CheckQuery(query, forceSend); err != nil {
 		return err
 	}
@@ -227,7 +260,7 @@ func generateCommands(query string, pipeContext string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
 	defer cancel()
 
-	commands, err := provider.Generate(ctx, query, cfg.LLM.Count, pipeContext)
+	commands, err := provider.Generate(ctx, query, cfg.LLM.Count, pipeContext, followUp)
 	if err != nil {
 		return fmt.Errorf("failed to generate commands: %w", err)
 	}

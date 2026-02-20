@@ -47,7 +47,8 @@ func categorizeAPIError(err error) error {
 
 // Generate creates shell commands based on user query.
 // pipeContext contains optional stdin data piped into qx for additional context.
-func (p *baseProvider) Generate(ctx context.Context, query string, count int, pipeContext string) ([]string, error) {
+// followUp, when non-nil, injects previous query/command as conversation history for refinement.
+func (p *baseProvider) Generate(ctx context.Context, query string, count int, pipeContext string, followUp *FollowUpContext) ([]string, error) {
 	if query == "" {
 		return nil, fmt.Errorf("query cannot be empty")
 	}
@@ -57,18 +58,11 @@ func (p *baseProvider) Generate(ctx context.Context, query string, count int, pi
 		userMessage = fmt.Sprintf("Context:\n<stdin>\n%s\n</stdin>\n\nTask: %s", pipeContext, query)
 	}
 
+	messages := buildMessages(count, pipeContext, userMessage, followUp)
+
 	req := openai.ChatCompletionRequest{
-		Model: p.model,
-		Messages: []openai.ChatCompletionMessage{
-			{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: SystemPrompt(count, pipeContext != ""),
-			},
-			{
-				Role:    openai.ChatMessageRoleUser,
-				Content: userMessage,
-			},
-		},
+		Model:    p.model,
+		Messages: messages,
 		ResponseFormat: &openai.ChatCompletionResponseFormat{
 			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
 		},
@@ -101,4 +95,28 @@ func (p *baseProvider) Generate(ctx context.Context, query string, count int, pi
 	}
 
 	return commands, nil
+}
+
+// buildMessages constructs the chat message list for the LLM request.
+// When followUp is non-nil, inserts previous query/command as conversation history.
+func buildMessages(count int, pipeContext string, userMessage string, followUp *FollowUpContext) []openai.ChatCompletionMessage {
+	hasFollowUp := followUp != nil
+	systemMsg := openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleSystem,
+		Content: SystemPrompt(count, pipeContext != "", hasFollowUp),
+	}
+
+	if !hasFollowUp {
+		return []openai.ChatCompletionMessage{
+			systemMsg,
+			{Role: openai.ChatMessageRoleUser, Content: userMessage},
+		}
+	}
+
+	return []openai.ChatCompletionMessage{
+		systemMsg,
+		{Role: openai.ChatMessageRoleUser, Content: followUp.PreviousQuery},
+		{Role: openai.ChatMessageRoleAssistant, Content: followUp.PreviousCommand},
+		{Role: openai.ChatMessageRoleUser, Content: userMessage},
+	}
 }

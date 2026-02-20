@@ -11,9 +11,15 @@ type Config struct {
 	Count    int // number of command variants to generate
 }
 
+// FollowUpContext contains previous query and command for refinement mode.
+type FollowUpContext struct {
+	PreviousQuery   string
+	PreviousCommand string
+}
+
 // Provider generates shell commands using LLM
 type Provider interface {
-	Generate(ctx context.Context, query string, count int, pipeContext string) ([]string, error)
+	Generate(ctx context.Context, query string, count int, pipeContext string, followUp *FollowUpContext) ([]string, error)
 }
 
 // NewProvider creates appropriate provider based on configuration

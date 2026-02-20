@@ -25,7 +25,7 @@ func TestGenerateCommands_QueryWithSecrets(t *testing.T) {
 	defer func() { forceSend = origForceSend }()
 	forceSend = false
 
-	err := generateCommands("use key AKIAIOSFODNN7EXAMPLE", "some safe context")
+	err := generateCommands("use key AKIAIOSFODNN7EXAMPLE", "some safe context", nil)
 	if err == nil {
 		t.Fatal("expected error for query with secrets")
 	}
@@ -47,7 +47,7 @@ func TestGenerateCommands_EmptyPipeContextSkipsGuard(t *testing.T) {
 
 	// With empty pipe context, only the query is checked.
 	// Should pass guard check and fail later at config.Load().
-	err := generateCommands("list files", "")
+	err := generateCommands("list files", "", nil)
 
 	var secretsErr *guard.SecretsError
 	if errors.As(err, &secretsErr) {
@@ -354,5 +354,59 @@ func TestSaveToHistory_EmptyPipeContext(t *testing.T) {
 	}
 	if got.PipeContext != "" {
 		t.Errorf("PipeContext = %q, want empty", got.PipeContext)
+	}
+}
+
+func TestRunContinue_EmptyHistory(t *testing.T) {
+	withTempHistoryStore(t)
+
+	err := runContinue("make it recursive", "")
+	if err == nil {
+		t.Fatal("expected error for empty history")
+	}
+	if got := err.Error(); got != "no history yet — run a query first" {
+		t.Errorf("error = %q, want %q", got, "no history yet — run a query first")
+	}
+}
+
+func TestRunContinue_StoreCreationError(t *testing.T) {
+	orig := newHistoryStore
+	newHistoryStore = func() (*history.Store, error) {
+		return nil, fmt.Errorf("no home directory")
+	}
+	t.Cleanup(func() { newHistoryStore = orig })
+
+	err := runContinue("refine this", "")
+	if err == nil {
+		t.Fatal("expected error when store creation fails")
+	}
+	want := "failed to access history: no home directory"
+	if got := err.Error(); got != want {
+		t.Errorf("error = %q, want %q", got, want)
+	}
+}
+
+func TestRunContinue_WithHistory(t *testing.T) {
+	store := withTempHistoryStore(t)
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Commands:  []string{"find . -size +100M", "du -sh * | sort -rh"},
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	// runContinue will try to load config and create LLM provider,
+	// which will fail in test environment. That's expected.
+	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+
+	err := runContinue("only go files", "")
+	if err == nil {
+		t.Fatal("expected error from config.Load() in test environment")
+	}
+
+	// The error should come from config.Load(), not from history access
+	if got := err.Error(); got == "no history yet — run a query first" {
+		t.Error("should not get empty history error when history has entries")
 	}
 }
