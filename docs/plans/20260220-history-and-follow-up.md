@@ -126,15 +126,15 @@ These features share a common storage layer: follow-up reads the latest history 
 
 ### Task 7: Verify acceptance criteria
 
-- [ ] verify `--last` shows last command and opens action menu
-- [ ] verify `--history` opens fzf picker with past queries
-- [ ] verify `--continue "refinement"` sends previous context to LLM
-- [ ] verify history rotation works at 100 entries
-- [ ] verify empty history is handled gracefully for all three flags
-- [ ] verify pipe context is preserved in history entries
-- [ ] run full test suite (`go test ./...`)
-- [ ] run linter (`golangci-lint run`)
-- [ ] verify test coverage for `internal/history/` package
+- [x] verify `--last` shows last command and opens action menu
+- [x] verify `--history` opens fzf picker with past queries
+- [x] verify `--continue "refinement"` sends previous context to LLM
+- [x] verify history rotation works at 100 entries
+- [x] verify empty history is handled gracefully for all three flags
+- [x] verify pipe context is preserved in history entries
+- [x] run full test suite (`go test ./...`)
+- [x] run linter (`golangci-lint run`)
+- [x] verify test coverage for `internal/history/` package
 
 ### Task 8: Update documentation
 
