@@ -471,6 +471,9 @@ func TestRun_MutuallyExclusiveFlags(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error for mutually exclusive flags")
 			}
+			if !strings.Contains(err.Error(), "none of the others can be") {
+				t.Errorf("expected mutual exclusivity error, got: %q", err.Error())
+			}
 		})
 	}
 }
@@ -736,11 +739,11 @@ func TestHandleSelectedCommand_ActionMenuEnabled_StdoutPipe_StderrTTY(t *testing
 	// When action_menu is enabled, stdout is a pipe, and stderr is a TTY,
 	// the action menu should be shown (shell integration mode).
 	withMockFns(t)
-	withTempHistoryStore(t)
+	store := withTempHistoryStore(t)
 
 	actionMenuEnabled = true
-	shouldPromptFn = func() bool { return false }       // stdout is pipe
-	shouldPromptStderrFn = func() bool { return true }  // stderr is TTY
+	shouldPromptFn = func() bool { return false }      // stdout is pipe
+	shouldPromptStderrFn = func() bool { return true } // stderr is TTY
 
 	var menuShown bool
 	promptActionFn = func(cmd string) error {
@@ -765,13 +768,20 @@ func TestHandleSelectedCommand_ActionMenuEnabled_StdoutPipe_StderrTTY(t *testing
 	if !menuShown {
 		t.Error("expected action menu to be shown when action_menu enabled and stderr is TTY")
 	}
+	entries, _ := store.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(entries))
+	}
+	if entries[0].Selected != "echo hello" {
+		t.Errorf("Selected = %q, want %q", entries[0].Selected, "echo hello")
+	}
 }
 
 func TestHandleSelectedCommand_ActionMenuEnabled_StdoutPipe_StderrPipe(t *testing.T) {
 	// When action_menu is enabled but both stdout and stderr are pipes,
 	// the command should be printed to stdout without the menu.
 	withMockFns(t)
-	withTempHistoryStore(t)
+	store := withTempHistoryStore(t)
 
 	actionMenuEnabled = true
 	shouldPromptFn = func() bool { return false }       // stdout is pipe
@@ -793,6 +803,10 @@ func TestHandleSelectedCommand_ActionMenuEnabled_StdoutPipe_StderrPipe(t *testin
 	_ = r.Close()
 	if string(out) != "echo hello\n" {
 		t.Errorf("output = %q, want %q", string(out), "echo hello\n")
+	}
+	entries, _ := store.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(entries))
 	}
 }
 
@@ -825,7 +839,7 @@ func TestHandleSelectedCommand_ActionMenuDisabled_DefaultBehavior(t *testing.T) 
 	}
 }
 
-func TestHandleSelectedCommand_ActionMenuEnabled_StdoutTTY(t *testing.T) {
+func TestHandleSelectedCommand_StdoutTTY_ShowsMenuRegardlessOfConfig(t *testing.T) {
 	// When stdout IS a TTY, action menu shows regardless of actionMenuEnabled.
 	withMockFns(t)
 	withTempHistoryStore(t)

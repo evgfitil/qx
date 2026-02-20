@@ -78,6 +78,7 @@ llm:
 
 func TestLoad_PopulatesActionMenu(t *testing.T) {
 	viper.Reset()
+	t.Cleanup(func() { viper.Reset() })
 
 	setupConfigFile(t, `action_menu: true
 llm:
@@ -98,6 +99,7 @@ llm:
 
 func TestLoad_ActionMenuDefaultsFalse(t *testing.T) {
 	viper.Reset()
+	t.Cleanup(func() { viper.Reset() })
 
 	setupConfigFile(t, `llm:
   base_url: "https://api.example.com/v1"

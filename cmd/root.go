@@ -23,14 +23,14 @@ import (
 const ExitCodeCancelled = 130
 
 var (
-	Version          = "dev"
-	shellIntegration string
-	showConfig       bool
-	queryFlag        string
-	forceSend        bool
-	lastFlag         bool
-	historyFlag      bool
-	continueFlag     bool
+	Version           = "dev"
+	shellIntegration  string
+	showConfig        bool
+	queryFlag         string
+	forceSend         bool
+	lastFlag          bool
+	historyFlag       bool
+	continueFlag      bool
 	actionMenuEnabled bool
 )
 
@@ -319,8 +319,10 @@ func saveToHistory(entry history.Entry) {
 	_ = store.Add(entry)
 }
 
-// handleSelectedCommand either shows the post-selection action menu (when
-// stdout is a TTY) or prints the command to stdout (when redirected).
+// handleSelectedCommand shows the post-selection action menu when stdout is
+// a TTY. When action_menu config is enabled, the menu also shows if stderr
+// is a TTY (shell integration mode where stdout is captured). Otherwise
+// prints the command to stdout directly.
 // When the user chooses "revise", it reads a refinement query and starts
 // a new generation cycle with follow-up context. History is saved only
 // on the final action (execute/copy/quit), not on intermediate revisions.
