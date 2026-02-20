@@ -149,12 +149,13 @@ These features share a common storage layer: follow-up reads the latest history 
 ```go
 type Entry struct {
     Query       string    `json:"query"`
-    Commands    []string  `json:"commands"`
     Selected    string    `json:"selected"`
     PipeContext string    `json:"pipe_context,omitempty"`
     Timestamp   time.Time `json:"timestamp"`
 }
 ```
+
+Note: `Commands []string` was removed in the revise-action-and-cleanup follow-up work.
 
 ### Storage file
 

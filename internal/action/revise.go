@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 	"strings"
-
-	"golang.org/x/term"
 )
 
 // ErrEmptyRefinement indicates the user submitted an empty refinement query.
@@ -22,14 +20,6 @@ func ReadRefinement() (string, error) {
 		return "", fmt.Errorf("failed to open /dev/tty: %w", err)
 	}
 	defer func() { _ = tty.Close() }()
-
-	// Terminal may still be in raw mode from the action menu keypress reader.
-	// Restore cooked mode so line editing (backspace, etc.) works normally.
-	oldState, err := term.GetState(int(tty.Fd()))
-	if err == nil {
-		_ = term.Restore(int(tty.Fd()), oldState)
-		defer func() { _ = term.Restore(int(tty.Fd()), oldState) }()
-	}
 
 	fmt.Fprint(os.Stderr, "\n  > ")
 

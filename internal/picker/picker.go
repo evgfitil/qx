@@ -40,13 +40,13 @@ func PickIndex(n int, display func(i int) string) (int, error) {
 		return -1, errors.New("no items to pick from")
 	}
 
-	items := make([]int, n)
-	for i := range items {
-		items[i] = i
+	indices := make([]int, n)
+	for i := range indices {
+		indices[i] = i
 	}
 
-	idx, err := fuzzyfinder.Find(items, func(i int) string {
-		return display(items[i])
+	idx, err := fuzzyfinder.Find(indices, func(i int) string {
+		return display(i)
 	})
 	if err != nil {
 		if errors.Is(err, fuzzyfinder.ErrAbort) {
@@ -55,5 +55,5 @@ func PickIndex(n int, display func(i int) string) (int, error) {
 		return -1, err
 	}
 
-	return items[idx], nil
+	return idx, nil
 }

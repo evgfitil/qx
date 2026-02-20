@@ -15,9 +15,7 @@ import (
 var ErrCancelled = errors.New("action cancelled")
 
 // ReviseRequestedError indicates the user wants to revise the selected command.
-type ReviseRequestedError struct {
-	Command string
-}
+type ReviseRequestedError struct{}
 
 func (e *ReviseRequestedError) Error() string {
 	return "revise requested"
@@ -144,7 +142,7 @@ func dispatchAction(act Action, command string) error {
 		fmt.Fprintln(os.Stderr, "Copied to clipboard.")
 		return nil
 	case ActionRevise:
-		return &ReviseRequestedError{Command: command}
+		return &ReviseRequestedError{}
 	case ActionQuit:
 		fmt.Println(command)
 		return nil

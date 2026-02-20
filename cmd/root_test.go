@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -441,9 +442,13 @@ func TestRunContinue_WithHistory(t *testing.T) {
 		t.Fatal("expected error from config.Load() in test environment")
 	}
 
-	// The error should come from config.Load(), not from history access
-	if got := err.Error(); got == "no history yet — run a query first" {
+	// The error should come from generateCommands (config.Load), not from history access
+	got := err.Error()
+	if got == "no history yet — run a query first" {
 		t.Error("should not get empty history error when history has entries")
+	}
+	if !strings.Contains(got, "failed to load config") && !strings.Contains(got, "failed to generate") {
+		t.Errorf("expected config/generate error, got: %q", got)
 	}
 }
 
@@ -469,7 +474,7 @@ func TestHandleSelectedCommand_Revise_FollowUpContext(t *testing.T) {
 
 	shouldPromptFn = func() bool { return true }
 	promptActionFn = func(cmd string) error {
-		return &action.ReviseRequestedError{Command: cmd}
+		return &action.ReviseRequestedError{}
 	}
 	readRefinementFn = func() (string, error) {
 		return "make it recursive", nil
@@ -518,7 +523,7 @@ func TestHandleSelectedCommand_Revise_EmptyRefinement(t *testing.T) {
 
 	shouldPromptFn = func() bool { return true }
 	promptActionFn = func(cmd string) error {
-		return &action.ReviseRequestedError{Command: cmd}
+		return &action.ReviseRequestedError{}
 	}
 	readRefinementFn = func() (string, error) {
 		return "", action.ErrEmptyRefinement
@@ -535,7 +540,7 @@ func TestHandleSelectedCommand_Revise_ReadError(t *testing.T) {
 
 	shouldPromptFn = func() bool { return true }
 	promptActionFn = func(cmd string) error {
-		return &action.ReviseRequestedError{Command: cmd}
+		return &action.ReviseRequestedError{}
 	}
 	readRefinementFn = func() (string, error) {
 		return "", fmt.Errorf("failed to read from tty")
@@ -559,7 +564,7 @@ func TestHandleSelectedCommand_Revise_HistorySavedOnFinalAction(t *testing.T) {
 	promptActionFn = func(cmd string) error {
 		callCount++
 		if callCount == 1 {
-			return &action.ReviseRequestedError{Command: cmd}
+			return &action.ReviseRequestedError{}
 		}
 		// Simulate quit: print command, return nil
 		fmt.Println(cmd)
@@ -628,5 +633,46 @@ func TestHandleSelectedCommand_NonTTY_SavesHistory(t *testing.T) {
 	}
 	if entries[0].PipeContext != "pipe data" {
 		t.Errorf("PipeContext = %q, want %q", entries[0].PipeContext, "pipe data")
+	}
+}
+
+func TestHandleSelectedCommand_TTY_CancelledReturnsErrCancelled(t *testing.T) {
+	withMockFns(t)
+
+	shouldPromptFn = func() bool { return true }
+	promptActionFn = func(cmd string) error {
+		return action.ErrCancelled
+	}
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	if !errors.Is(err, ErrCancelled) {
+		t.Errorf("expected ErrCancelled, got %v", err)
+	}
+}
+
+func TestHandleSelectedCommand_TTY_ActionErrorSavesHistory(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	actionErr := fmt.Errorf("execution failed: exit status 1")
+	shouldPromptFn = func() bool { return true }
+	promptActionFn = func(cmd string) error {
+		return actionErr
+	}
+
+	err := handleSelectedCommand("bad-cmd", "run thing", "ctx")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if err.Error() != actionErr.Error() {
+		t.Errorf("error = %q, want %q", err.Error(), actionErr.Error())
+	}
+
+	entries, _ := store.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(entries))
+	}
+	if entries[0].Selected != "bad-cmd" {
+		t.Errorf("Selected = %q, want %q", entries[0].Selected, "bad-cmd")
 	}
 }

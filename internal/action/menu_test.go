@@ -294,9 +294,6 @@ func TestDispatchAction_Revise(t *testing.T) {
 	if !errors.As(err, &reviseErr) {
 		t.Fatalf("expected ReviseRequestedError, got %T: %v", err, err)
 	}
-	if reviseErr.Command != "echo hello" {
-		t.Errorf("ReviseRequestedError.Command = %q, want %q", reviseErr.Command, "echo hello")
-	}
 }
 
 func TestPromptActionWith_Revise(t *testing.T) {
@@ -321,8 +318,5 @@ func TestPromptActionWith_Revise(t *testing.T) {
 	var reviseErr *ReviseRequestedError
 	if !errors.As(promptErr, &reviseErr) {
 		t.Fatalf("expected ReviseRequestedError, got %T: %v", promptErr, promptErr)
-	}
-	if reviseErr.Command != "echo hello" {
-		t.Errorf("ReviseRequestedError.Command = %q, want %q", reviseErr.Command, "echo hello")
 	}
 }
