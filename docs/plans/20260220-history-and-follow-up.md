@@ -96,21 +96,21 @@ These features share a common storage layer: follow-up reads the latest history 
 
 ### Task 4: Implement --last flag
 
-- [ ] add `--last` flag to cobra command in `cmd/root.go`
-- [ ] when `--last` is set: load `Store.Last()`, print the selected command, invoke `action.PromptAction()` on it
-- [ ] handle empty history case — print informative error message
-- [ ] write tests for `--last` flag (with history, without history)
-- [ ] run tests — must pass before next task
+- [x] add `--last` flag to cobra command in `cmd/root.go`
+- [x] when `--last` is set: load `Store.Last()`, print the selected command, invoke `action.PromptAction()` on it
+- [x] handle empty history case — print informative error message
+- [x] write tests for `--last` flag (with history, without history)
+- [x] run tests — must pass before next task
 
 ### Task 5: Implement --history flag with fzf picker
 
-- [ ] add `--history` flag to cobra command in `cmd/root.go`
-- [ ] when `--history` is set: load `Store.List()`, format entries for display (query + selected command + timestamp)
-- [ ] use `internal/picker` (go-fuzzyfinder) to present entries for selection
-- [ ] selected entry goes to `action.PromptAction()` with the stored command
-- [ ] handle empty history — print informative error message
-- [ ] write tests for history picker flow
-- [ ] run tests — must pass before next task
+- [x] add `--history` flag to cobra command in `cmd/root.go`
+- [x] when `--history` is set: load `Store.List()`, format entries for display (query + selected command + timestamp)
+- [x] use `internal/picker` (go-fuzzyfinder) to present entries for selection
+- [x] selected entry goes to `action.PromptAction()` with the stored command
+- [x] handle empty history — print informative error message
+- [x] write tests for history picker flow
+- [x] run tests — must pass before next task
 
 ### Task 6: Implement --continue flag with follow-up context
 
