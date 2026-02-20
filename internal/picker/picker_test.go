@@ -25,3 +25,17 @@ func TestPick_NilCommands(t *testing.T) {
 		t.Error("expected error for nil commands")
 	}
 }
+
+func TestPickIndex_Empty(t *testing.T) {
+	_, err := PickIndex(0, func(i int) string { return "" })
+	if err == nil {
+		t.Error("expected error for zero items")
+	}
+}
+
+func TestPickIndex_NegativeCount(t *testing.T) {
+	_, err := PickIndex(-1, func(i int) string { return "" })
+	if err == nil {
+		t.Error("expected error for negative count")
+	}
+}

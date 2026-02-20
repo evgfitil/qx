@@ -13,13 +13,20 @@ type commandsResponse struct {
 // SystemPrompt generates the system prompt for command generation.
 // count specifies how many command variants should be generated.
 // hasPipeContext indicates whether stdin context is provided with the request.
-func SystemPrompt(count int, hasPipeContext bool) string {
+// hasFollowUp indicates whether this is a follow-up refinement of a previous command.
+func SystemPrompt(count int, hasPipeContext bool, hasFollowUp bool) string {
 	pipeRules := ""
 	if hasPipeContext {
 		pipeRules = `
 - When stdin context is provided, use the concrete values from it to generate precise commands
 - Generate commands that reference actual data from the context (file names, container IDs, process IDs, etc.)
 - Identify the source tool from the context and prefer using its built-in capabilities for filtering, sorting, and formatting over adding separate tools to the pipeline`
+	}
+
+	followUpRules := ""
+	if hasFollowUp {
+		followUpRules = `
+- The user is refining a previous command. Consider the conversation history and generate commands that address the user's refinement request`
 	}
 
 	return fmt.Sprintf(`You are a shell command generator. Generate shell commands based on user descriptions.
@@ -33,12 +40,12 @@ Rules:
 - When a tool supports structured output (JSON, YAML, CSV), use its native query capabilities rather than text processing with grep/awk/sed
 - Minimize pipe chains: fewer pipes = better
 - Never include explanations, only raw commands
-- Each command should solve the same task in a different way%s
+- Each command should solve the same task in a different way%s%s
 
 Response format (JSON):
 {
   "commands": ["command1", "command2", ...]
-}`, count, pipeRules)
+}`, count, pipeRules, followUpRules)
 }
 
 // ParseCommands parses JSON response from LLM into a list of commands

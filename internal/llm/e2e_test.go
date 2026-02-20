@@ -69,7 +69,7 @@ func TestE2E_SingleToolPreference_NoPipe(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			commands, err := provider.Generate(ctx, tt.query, 3, "")
+			commands, err := provider.Generate(ctx, tt.query, 3, "", nil)
 			if err != nil {
 				t.Fatalf("Generate failed: %v", err)
 			}
@@ -132,7 +132,7 @@ func TestE2E_SingleToolPreference_WithPipe(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			commands, err := provider.Generate(ctx, tt.query, 3, tt.pipeContext)
+			commands, err := provider.Generate(ctx, tt.query, 3, tt.pipeContext, nil)
 			if err != nil {
 				t.Fatalf("Generate failed: %v", err)
 			}

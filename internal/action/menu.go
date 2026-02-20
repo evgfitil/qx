@@ -14,12 +14,20 @@ import (
 // ErrCancelled indicates the user cancelled without choosing an action.
 var ErrCancelled = errors.New("action cancelled")
 
+// ReviseRequestedError indicates the user wants to revise the selected command.
+type ReviseRequestedError struct{}
+
+func (e *ReviseRequestedError) Error() string {
+	return "revise requested"
+}
+
 // Action represents a post-selection action chosen by the user.
 type Action int
 
 const (
 	ActionExecute Action = iota
 	ActionCopy
+	ActionRevise
 	ActionQuit
 	ActionCancel
 )
@@ -45,6 +53,8 @@ func readKeypress(r io.Reader) (Action, error) {
 			return ActionExecute, nil
 		case 'c', 'C':
 			return ActionCopy, nil
+		case 'r', 'R':
+			return ActionRevise, nil
 		case 'q', 'Q', '\r', '\n':
 			return ActionQuit, nil
 		case 0x03: // Ctrl+C
@@ -84,7 +94,7 @@ func PromptAction(command string) error {
 func promptActionWith(command string, ttyReader io.Reader) error {
 	hi := "\033[38;5;205m"
 	rs := "\033[0m"
-	fmt.Fprintf(os.Stderr, "\n  %s\n\n  [%se%s]xecute  [%sc%s]opy  [%sq%s]uit ", command, hi, rs, hi, rs, hi, rs)
+	fmt.Fprintf(os.Stderr, "\n  %s\n\n  [%se%s]xecute  [%sc%s]opy  [%sr%s]evise  [%sq%s]uit ", command, hi, rs, hi, rs, hi, rs, hi, rs)
 
 	act, err := readAction(ttyReader)
 	if err != nil {
@@ -131,6 +141,8 @@ func dispatchAction(act Action, command string) error {
 		}
 		fmt.Fprintln(os.Stderr, "Copied to clipboard.")
 		return nil
+	case ActionRevise:
+		return &ReviseRequestedError{}
 	case ActionQuit:
 		fmt.Println(command)
 		return nil

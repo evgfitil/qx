@@ -287,7 +287,7 @@ func (m Model) View() string {
 // Returns SelectedResult if a command was selected, CancelledResult otherwise.
 func (m Model) Result() Result {
 	if m.selected != "" {
-		return SelectedResult{Command: m.selected}
+		return SelectedResult{Command: m.selected, Query: m.originalQuery}
 	}
 	// In select/loading states, textArea may contain filter text or still has query,
 	// but originalQuery always has the submitted query
@@ -307,7 +307,7 @@ func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd 
 		ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
 		defer cancel()
 
-		commands, err := provider.Generate(ctx, query, cfg.Count, pipeContext)
+		commands, err := provider.Generate(ctx, query, cfg.Count, pipeContext, nil)
 		if err != nil {
 			return commandsMsg{err: err}
 		}

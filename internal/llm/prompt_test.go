@@ -61,7 +61,7 @@ func TestSystemPrompt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SystemPrompt(tt.count, tt.hasPipeContext)
+			got := SystemPrompt(tt.count, tt.hasPipeContext, false)
 			if got == "" {
 				t.Error("SystemPrompt returned empty string")
 			}
@@ -76,6 +76,32 @@ func TestSystemPrompt(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSystemPrompt_FollowUp(t *testing.T) {
+	t.Run("without follow-up does not contain refinement rules", func(t *testing.T) {
+		got := SystemPrompt(3, false, false)
+		if strings.Contains(got, "refining a previous command") {
+			t.Error("SystemPrompt should not contain follow-up rules when hasFollowUp is false")
+		}
+	})
+
+	t.Run("with follow-up includes refinement rules", func(t *testing.T) {
+		got := SystemPrompt(3, false, true)
+		if !strings.Contains(got, "refining a previous command") {
+			t.Error("SystemPrompt should contain follow-up refinement rules when hasFollowUp is true")
+		}
+	})
+
+	t.Run("with follow-up and pipe context includes both rules", func(t *testing.T) {
+		got := SystemPrompt(3, true, true)
+		if !strings.Contains(got, "refining a previous command") {
+			t.Error("SystemPrompt should contain follow-up rules")
+		}
+		if !strings.Contains(got, "stdin context is provided") {
+			t.Error("SystemPrompt should contain pipe context rules")
+		}
+	})
 }
 
 func TestParseCommands(t *testing.T) {

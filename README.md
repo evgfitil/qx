@@ -13,9 +13,10 @@ Generate shell commands from natural language using LLM.
 - Natural language to shell command conversion
 - Multiple command variants with fuzzy selection
 - Interactive TUI with real-time filtering
-- Post-selection actions: execute, copy to clipboard, or print to stdout
+- Post-selection actions: execute, copy to clipboard, revise with follow-up, or print to stdout
 - Pipe command output as context for precise command generation
 - Shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support
+- Command history with `--last`, `--history`, and `--continue` for follow-up refinement
 - Support for OpenAI-compatible APIs
 
 ## Installation
@@ -129,6 +130,35 @@ kubectl get pods | qx
 
 Stdin input is limited to 64KB. Content is checked for secrets before being sent to the LLM.
 
+### History and follow-up
+
+Show the last selected command and open the action menu:
+
+```bash
+qx --last
+```
+
+Browse past queries with an interactive fuzzy picker:
+
+```bash
+qx --history
+```
+
+Refine the last command with a follow-up query:
+
+```bash
+qx --continue "make it recursive"
+qx --continue "add verbose output"
+```
+
+`--continue` also works with pipe context:
+
+```bash
+ls -la | qx --continue "only show directories"
+```
+
+History is stored in `~/.config/qx/history.json` and keeps the last 100 entries.
+
 ### Post-selection actions
 
 After selecting a command (in any mode), an action menu appears:
@@ -136,13 +166,18 @@ After selecting a command (in any mode), an action menu appears:
 ```text
   docker stop $(docker ps -q --filter ancestor=nginx)
 
-  [e]xecute  [c]opy  [q]uit
+  [e]xecute  [c]opy  [r]evise  [q]uit
 ```
 
 - `e` - execute the command in a subprocess
 - `c` - copy to clipboard
+- `r` - revise the command with a follow-up refinement query
 - `q` or Enter - print to stdout
 - Esc or Ctrl+C - cancel without any action
+
+Revise lets you iteratively refine commands without leaving the flow.
+Press `r`, type a refinement (e.g., "make it recursive"), and qx generates
+new variants using the previous command as context.
 
 The menu only appears when running in a terminal. When stdout is redirected
 (e.g., via shell integration Ctrl+G), the command is printed to stdout directly.

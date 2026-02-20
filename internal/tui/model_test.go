@@ -712,6 +712,95 @@ func TestResult_OriginalQueryInSelectState(t *testing.T) {
 	}
 }
 
+func TestSelectedResult_ContainsOriginalQuery(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "list files", false, "")
+
+	// Simulate submitting the query (Enter in stateInput)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+
+	// Simulate receiving commands from LLM
+	updated, _ = m.Update(commandsMsg{commands: []string{"ls -la", "ls -lah"}})
+	m = updated.(Model)
+
+	// Simulate selecting a command (Enter in stateSelect)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	result := model.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatal("expected SelectedResult")
+	}
+	if selected.Command != "ls -la" {
+		t.Errorf("expected Command = %q, got %q", "ls -la", selected.Command)
+	}
+	if selected.Query != "list files" {
+		t.Errorf("expected Query = %q, got %q", "list files", selected.Query)
+	}
+}
+
+func TestSelectedResult_QueryFromDirectSelection(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+
+	// Set up model state as if query was submitted and commands received
+	m.originalQuery = "find large files"
+	m.commands = []string{"find . -size +1G", "du -sh *"}
+	m.filtered = m.commands
+	m.state = stateSelect
+	m.cursor = 0
+
+	// Select the first command
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	result := model.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatal("expected SelectedResult")
+	}
+	if selected.Query != "find large files" {
+		t.Errorf("expected Query = %q, got %q", "find large files", selected.Query)
+	}
+}
+
+func TestSelectedResult_QueryEmptyWhenNoQuerySubmitted(t *testing.T) {
+	cfg := llm.Config{
+		BaseURL: "http://localhost",
+		APIKey:  "test",
+		Model:   "test",
+		Count:   3,
+	}
+
+	m := NewModel(cfg, "", false, "")
+
+	// Directly set selected without going through query submission
+	m.selected = "ls -la"
+
+	result := m.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatal("expected SelectedResult")
+	}
+	if selected.Query != "" {
+		t.Errorf("expected Query = %q, got %q", "", selected.Query)
+	}
+}
+
 func TestHandleEnter_PipeContextNoSecret(t *testing.T) {
 	cfg := llm.Config{
 		BaseURL: "http://localhost",
