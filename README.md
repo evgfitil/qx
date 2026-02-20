@@ -16,7 +16,7 @@ Generate shell commands from natural language using LLM.
 - Post-selection actions: execute, copy to clipboard, revise with follow-up, or print to stdout
 - Pipe command output as context for precise command generation
 - Shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support
-- Command history with `--last`, `--history`, and `--continue` for follow-up refinement
+- Command history with `--last` (`-l`), `--history`, and `--continue` (`-c`) for follow-up refinement
 - Support for OpenAI-compatible APIs
 
 ## Installation
@@ -50,6 +50,8 @@ llm:
   model: "gpt-4o-mini"
   count: 3  # how many commands to suggest
   apikey: "your-key-here"  # optional, can use env variable instead
+
+action_menu: true  # show action menu in shell integration mode (default: false)
 ```
 
 **API Key**: Set via `OPENAI_API_KEY` environment variable or `llm.apikey` in config.
@@ -136,6 +138,7 @@ Show the last selected command and open the action menu:
 
 ```bash
 qx --last
+qx -l
 ```
 
 Browse past queries with an interactive fuzzy picker:
@@ -148,7 +151,7 @@ Refine the last command with a follow-up query:
 
 ```bash
 qx --continue "make it recursive"
-qx --continue "add verbose output"
+qx -c "add verbose output"
 ```
 
 `--continue` also works with pipe context:
@@ -181,6 +184,10 @@ new variants using the previous command as context.
 
 The menu only appears when running in a terminal. When stdout is redirected
 (e.g., via shell integration Ctrl+G), the command is printed to stdout directly.
+
+To enable the action menu in shell integration mode, set `action_menu: true`
+in your config. This lets you choose an action (execute, copy, revise) before
+the command is inserted into your prompt.
 
 ## License
 
