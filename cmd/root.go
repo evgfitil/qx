@@ -28,6 +28,7 @@ var (
 	showConfig       bool
 	queryFlag        string
 	forceSend        bool
+	lastFlag         bool
 )
 
 // ErrCancelled indicates user cancelled the operation.
@@ -56,6 +57,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
 	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
+	rootCmd.Flags().BoolVar(&lastFlag, "last", false, "show last selected command and open action menu")
 }
 
 // Execute runs the root command
@@ -71,6 +73,10 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if shellIntegration != "" {
 		return handleShellIntegration(shellIntegration)
+	}
+
+	if lastFlag {
+		return runLast()
 	}
 
 	pipeContext, err := readStdin()
@@ -141,6 +147,24 @@ func handleShellIntegration(shellName string) error {
 	}
 	fmt.Print(script)
 	return nil
+}
+
+// runLast loads the most recent history entry and opens the action menu on it.
+func runLast() error {
+	store, err := newHistoryStore()
+	if err != nil {
+		return fmt.Errorf("failed to access history: %w", err)
+	}
+
+	entry, err := store.Last()
+	if err != nil {
+		if errors.Is(err, history.ErrEmpty) {
+			return fmt.Errorf("no history yet — run a query first")
+		}
+		return fmt.Errorf("failed to read history: %w", err)
+	}
+
+	return handleSelectedCommand(entry.Selected)
 }
 
 // generateCommands generates shell commands using LLM based on user query.

@@ -214,6 +214,71 @@ func TestSaveToHistory_StoreCreationError(t *testing.T) {
 	})
 }
 
+func TestRunLast_WithHistory(t *testing.T) {
+	store := withTempHistoryStore(t)
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Commands:  []string{"find . -size +100M", "du -sh * | sort -rh"},
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	runErr := runLast()
+	_ = w.Close()
+
+	if runErr != nil {
+		t.Fatalf("runLast() error = %v", runErr)
+	}
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if string(out) != "find . -size +100M\n" {
+		t.Errorf("runLast output = %q, want %q", string(out), "find . -size +100M\n")
+	}
+}
+
+func TestRunLast_EmptyHistory(t *testing.T) {
+	withTempHistoryStore(t)
+
+	err := runLast()
+	if err == nil {
+		t.Fatal("expected error for empty history")
+	}
+	if got := err.Error(); got != "no history yet — run a query first" {
+		t.Errorf("error = %q, want %q", got, "no history yet — run a query first")
+	}
+}
+
+func TestRunLast_StoreCreationError(t *testing.T) {
+	orig := newHistoryStore
+	newHistoryStore = func() (*history.Store, error) {
+		return nil, fmt.Errorf("no home directory")
+	}
+	t.Cleanup(func() { newHistoryStore = orig })
+
+	err := runLast()
+	if err == nil {
+		t.Fatal("expected error when store creation fails")
+	}
+	if !errors.Is(err, fmt.Errorf("")) {
+		// Just check error message contains the expected text
+		if got := err.Error(); got != "failed to access history: no home directory" {
+			t.Errorf("error = %q, want %q", got, "failed to access history: no home directory")
+		}
+	}
+}
+
 func TestSaveToHistory_EmptyPipeContext(t *testing.T) {
 	store := withTempHistoryStore(t)
 
