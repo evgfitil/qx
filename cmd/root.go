@@ -70,9 +70,9 @@ func init() {
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
 	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
-	rootCmd.Flags().BoolVar(&lastFlag, "last", false, "show last selected command and open action menu")
+	rootCmd.Flags().BoolVarP(&lastFlag, "last", "l", false, "show last selected command and open action menu")
 	rootCmd.Flags().BoolVar(&historyFlag, "history", false, "browse command history with interactive picker")
-	rootCmd.Flags().BoolVar(&continueFlag, "continue", false, "refine the last command with a new query")
+	rootCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "refine the last command with a new query")
 
 	rootCmd.MarkFlagsMutuallyExclusive("last", "history", "continue")
 }

@@ -535,6 +535,64 @@ func TestRun_SingleFlags_NoMutualExclusionError(t *testing.T) {
 	}
 }
 
+func TestRun_ShortFlagL_WorksAsLast(t *testing.T) {
+	store := withTempHistoryStore(t)
+	resetRootCmdFlags(t)
+	withTestConfig(t, false)
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	rootCmd.SetArgs([]string{"-l"})
+	err := rootCmd.Execute()
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("qx -l error = %v", err)
+	}
+	if string(out) != "find . -size +100M\n" {
+		t.Errorf("output = %q, want %q", string(out), "find . -size +100M\n")
+	}
+}
+
+func TestRun_ShortFlagC_WorksAsContinue(t *testing.T) {
+	store := withTempHistoryStore(t)
+	resetRootCmdFlags(t)
+
+	_ = store.Add(history.Entry{
+		Query:     "find files",
+		Selected:  "find . -name '*.go'",
+		Timestamp: time.Now(),
+	})
+
+	// runContinue will fail at config.Load() in test env — that's expected.
+	// We just verify the flag is recognized and triggers the continue path.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
+
+	rootCmd.SetArgs([]string{"-c", "only large files"})
+	err := rootCmd.Execute()
+
+	if err == nil {
+		t.Fatal("expected error from config.Load() in test environment")
+	}
+	// Should reach generateCommands (config.Load fails), not flag parsing error
+	if strings.Contains(err.Error(), "unknown shorthand flag") {
+		t.Errorf("short flag -c not recognized: %v", err)
+	}
+}
+
 // resetRootCmdFlags saves and restores flag state for rootCmd.
 // Must be called in tests that use rootCmd.Execute() with SetArgs.
 func resetRootCmdFlags(t *testing.T) {

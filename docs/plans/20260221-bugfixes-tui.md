@@ -193,11 +193,11 @@ rootCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "refine the last
 
 ### Refactor 2, Task 1: Добавить короткие флаги (`cmd/root.go`)
 
-- [ ] в `init()`: `--last` — заменить `BoolVar` на `BoolVarP` с коротким флагом `"l"`
-- [ ] в `init()`: `--continue` — заменить `BoolVar` на `BoolVarP` с коротким флагом `"c"`
-- [ ] update `root_test.go`: тест что `qx -l` работает как `qx --last`
-- [ ] update `root_test.go`: тест что `qx -c "query"` работает как `qx --continue "query"`
-- [ ] run tests (`go test ./...`) — must pass
+- [x] в `init()`: `--last` — заменить `BoolVar` на `BoolVarP` с коротким флагом `"l"`
+- [x] в `init()`: `--continue` — заменить `BoolVar` на `BoolVarP` с коротким флагом `"c"`
+- [x] update `root_test.go`: тест что `qx -l` работает как `qx --last`
+- [x] update `root_test.go`: тест что `qx -c "query"` работает как `qx --continue "query"`
+- [x] run tests (`go test ./...`) — must pass
 
 ### Verify acceptance criteria (all bugs)
 
