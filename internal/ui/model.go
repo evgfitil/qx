@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -146,7 +147,10 @@ func newSelectorModel(items []string, display func(int) string, theme Theme) Mod
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
 	if m.state == stateLoading {
-		return m.spinner.Tick
+		return tea.Batch(
+			m.spinner.Tick,
+			generateCommands(m.originalQuery, m.llmConfig, m.pipeContext),
+		)
 	}
 	return textarea.Blink
 }
@@ -191,6 +195,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = stateInput
 			return m, nil
 		}
+
+		if len(msg.commands) == 0 {
+			m.err = fmt.Errorf("no commands generated")
+			m.state = stateInput
+			return m, nil
+		}
+
 		m.commands = msg.commands
 		m.filtered = msg.commands
 		m.filteredIdx = make([]int, len(msg.commands))
@@ -207,6 +218,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
+		m.textArea.SetValue("")
+		m.textArea.Placeholder = "filter..."
+		m.textArea.MaxHeight = 1
+		m.textArea.SetHeight(1)
+		m.prevFilter = ""
 		m.state = stateSelect
 		return m, nil
 

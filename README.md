@@ -13,7 +13,7 @@ Generate shell commands from natural language using LLM.
 - Natural language to shell command conversion
 - Multiple command variants with fuzzy selection
 - Interactive TUI with real-time filtering
-- Post-selection actions: execute, copy to clipboard, revise with follow-up, or print to stdout
+- Optional post-selection action menu: execute, copy to clipboard, or revise with follow-up
 - Pipe command output as context for precise command generation
 - Shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support
 - Command history with `--last`, `--history`, and `--continue` for follow-up refinement
@@ -64,7 +64,7 @@ theme:
   prompt: "> "           # input prompt prefix
   pointer: "▌"           # cursor indicator for selected item
   selected_fg: "170"     # ANSI color or hex (#ff87d7)
-  match_fg: "205"        # highlight color for filter matches
+  match_fg: "205"        # input prompt color
   text_fg: "252"         # normal text color
   muted_fg: "241"        # counter and spinner text
   border: "rounded"      # rounded | normal | thick | hidden
@@ -185,7 +185,10 @@ History is stored in `~/.config/qx/history.json` and keeps the last 100 entries.
 
 ### Post-selection actions
 
-After selecting a command (in any mode), an action menu appears:
+By default, the selected command is printed to stdout. To enable the interactive
+action menu, set `action_menu: true` in your config (see [Action menu](#action-menu)).
+
+When the action menu is enabled and stdout is a TTY, it appears after selection:
 
 ```text
   docker stop $(docker ps -q --filter ancestor=nginx)
@@ -202,9 +205,6 @@ After selecting a command (in any mode), an action menu appears:
 Revise lets you iteratively refine commands without leaving the flow.
 Press `r`, type a refinement (e.g., "make it recursive"), and qx generates
 new variants using the previous command as context.
-
-The menu only appears when running in a terminal. When stdout is redirected
-(e.g., via shell integration Ctrl+G), the command is printed to stdout directly.
 
 ## License
 

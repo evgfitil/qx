@@ -158,7 +158,7 @@ func runInteractive(initialQuery string, pipeContext string) error {
 		Theme:        cfg.Theme.ToTheme(),
 	})
 	if err != nil {
-		return fmt.Errorf("TUI error: %w", err)
+		return err
 	}
 
 	switch r := result.(type) {
@@ -226,6 +226,9 @@ func runHistory() error {
 	}
 
 	theme := ui.DefaultTheme()
+	if cfg, loadErr := config.Load(); loadErr == nil {
+		theme = cfg.Theme.ToTheme()
+	}
 	idx, err := uiRunSelectorFn(items, func(i int) string {
 		return items[i]
 	}, theme)

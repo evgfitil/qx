@@ -448,6 +448,24 @@ func TestCommandsMsgSuccessResetsScrollOffset(t *testing.T) {
 	}
 }
 
+func TestCommandsMsgClearsTextarea(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "list files",
+		Theme:        DefaultTheme(),
+	})
+
+	cmds := []string{"ls -la", "find . -type f"}
+	updated, _ := m.Update(commandsMsg{commands: cmds})
+	model := updated.(Model)
+
+	if model.textArea.Value() != "" {
+		t.Errorf("textArea value = %q, want empty (should be cleared for filtering)", model.textArea.Value())
+	}
+	if model.prevFilter != "" {
+		t.Errorf("prevFilter = %q, want empty", model.prevFilter)
+	}
+}
+
 func TestCommandsMsgErrorPreservesQuery(t *testing.T) {
 	m := newModel(RunOptions{
 		InitialQuery: "my query",
@@ -1090,11 +1108,26 @@ func TestEmptyCommandList(t *testing.T) {
 	updated, _ := m.Update(commandsMsg{commands: []string{}})
 	model := updated.(Model)
 
-	if model.state != stateSelect {
-		t.Errorf("state = %d, want stateSelect (%d)", model.state, stateSelect)
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
 	}
-	if len(model.filtered) != 0 {
-		t.Errorf("filtered = %v, want empty", model.filtered)
+	if model.err == nil {
+		t.Error("err = nil, want 'no commands generated' error")
+	}
+}
+
+func TestEmptyCommandListNil(t *testing.T) {
+	m := newModel(RunOptions{InitialQuery: "test query", Theme: DefaultTheme()})
+	m.state = stateLoading
+
+	updated, _ := m.Update(commandsMsg{commands: nil})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
+	}
+	if model.err == nil {
+		t.Error("err = nil, want 'no commands generated' error")
 	}
 }
 
