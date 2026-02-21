@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
@@ -131,5 +132,99 @@ func TestCustomThemeColors(t *testing.T) {
 	}
 	if fg := theme.PromptStyle().GetForeground(); fg != lipgloss.Color("#00ff00") {
 		t.Errorf("PromptStyle with hex color: got %v, want #00ff00", fg)
+	}
+}
+
+func TestWithRendererReturnsCopy(t *testing.T) {
+	original := DefaultTheme()
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	themed := original.WithRenderer(r)
+
+	if original.renderer != nil {
+		t.Error("original theme renderer should remain nil")
+	}
+	if themed.renderer != r {
+		t.Error("WithRenderer should set the renderer on the returned copy")
+	}
+}
+
+func TestStyleGettersWithExplicitRenderer(t *testing.T) {
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	theme := DefaultTheme().WithRenderer(r)
+
+	tests := []struct {
+		name  string
+		style lipgloss.Style
+		fg    lipgloss.Color
+	}{
+		{"SelectedStyle", theme.SelectedStyle(), lipgloss.Color("170")},
+		{"NormalStyle", theme.NormalStyle(), lipgloss.Color("252")},
+		{"MutedStyle", theme.MutedStyle(), lipgloss.Color("241")},
+		{"PromptStyle", theme.PromptStyle(), lipgloss.Color("205")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.style.GetForeground(); got != tt.fg {
+				t.Errorf("%s foreground = %v, want %v", tt.name, got, tt.fg)
+			}
+		})
+	}
+}
+
+func TestStyleGettersWithoutRenderer(t *testing.T) {
+	theme := DefaultTheme()
+
+	// All style getters should work without a renderer (nil fallback).
+	tests := []struct {
+		name  string
+		style lipgloss.Style
+		fg    lipgloss.Color
+	}{
+		{"SelectedStyle", theme.SelectedStyle(), lipgloss.Color("170")},
+		{"NormalStyle", theme.NormalStyle(), lipgloss.Color("252")},
+		{"MutedStyle", theme.MutedStyle(), lipgloss.Color("241")},
+		{"PromptStyle", theme.PromptStyle(), lipgloss.Color("205")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.style.GetForeground(); got != tt.fg {
+				t.Errorf("%s foreground = %v, want %v", tt.name, got, tt.fg)
+			}
+		})
+	}
+}
+
+func TestNewStyleUsesRendererWhenSet(t *testing.T) {
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	theme := Theme{renderer: r}
+
+	style := theme.newStyle()
+	// The style should be created via the renderer (non-nil path).
+	// Verify it's a valid style by applying foreground.
+	styled := style.Foreground(lipgloss.Color("100"))
+	if styled.GetForeground() != lipgloss.Color("100") {
+		t.Error("newStyle with renderer should produce a working style")
+	}
+}
+
+func TestNewStyleFallsBackToDefault(t *testing.T) {
+	theme := Theme{}
+
+	style := theme.newStyle()
+	styled := style.Foreground(lipgloss.Color("200"))
+	if styled.GetForeground() != lipgloss.Color("200") {
+		t.Error("newStyle without renderer should fall back to lipgloss.NewStyle()")
+	}
+}
+
+func TestBorderStyleWithRenderer(t *testing.T) {
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	theme := Theme{Border: "rounded", BorderFg: "240", renderer: r}
+
+	style := theme.BorderStyle()
+	if fg := style.GetBorderTopForeground(); fg != lipgloss.Color("240") {
+		t.Errorf("BorderStyle with renderer: border foreground = %v, want Color(240)", fg)
 	}
 }
