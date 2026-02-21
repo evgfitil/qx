@@ -5,6 +5,7 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/evgfitil/qx/internal/llm"
 )
@@ -21,15 +22,16 @@ type RunOptions struct {
 // Run starts the full TUI flow (input -> loading -> selecting -> done)
 // and returns the result of user interaction.
 func Run(opts RunOptions) (Result, error) {
-	m := newModel(opts)
-
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
 	if err != nil {
 		tty = os.Stdout
+		opts.Theme = opts.Theme.WithRenderer(lipgloss.DefaultRenderer())
 	} else {
 		defer tty.Close() //nolint:errcheck
+		opts.Theme = opts.Theme.WithRenderer(lipgloss.NewRenderer(tty))
 	}
 
+	m := newModel(opts)
 	p := tea.NewProgram(m, tea.WithOutput(tty), tea.WithInputTTY())
 
 	result, err := p.Run()
@@ -47,15 +49,16 @@ func Run(opts RunOptions) (Result, error) {
 // RunSelector starts a selector-only TUI for picking from a list of items.
 // Returns the selected index or -1 if cancelled.
 func RunSelector(items []string, display func(int) string, theme Theme) (int, error) {
-	m := newSelectorModel(items, display, theme)
-
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
 	if err != nil {
 		tty = os.Stdout
+		theme = theme.WithRenderer(lipgloss.DefaultRenderer())
 	} else {
 		defer tty.Close() //nolint:errcheck
+		theme = theme.WithRenderer(lipgloss.NewRenderer(tty))
 	}
 
+	m := newSelectorModel(items, display, theme)
 	p := tea.NewProgram(m, tea.WithOutput(tty), tea.WithInputTTY())
 
 	result, err := p.Run()
