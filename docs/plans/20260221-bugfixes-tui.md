@@ -175,13 +175,13 @@ rootCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "refine the last
 
 ### Bug 3, Task 1: Auto-resize textarea в stateInput (`internal/ui/model.go`)
 
-- [ ] в `newModel()`: изменить `ta.SetHeight(3)` на `ta.SetHeight(1)` — начинаем с 1 строки; `ta.MaxHeight = 3` оставить
-- [ ] в `Update()`: после обновления textarea в блоке `stateInput` — вычислить нужную высоту через `m.textArea.LineInfo().Height` и вызвать `m.textArea.SetHeight()` если высота изменилась
-- [ ] обработать edge case: пустой textarea (Value() == "") — `LineInfo().Height` может вернуть 0, нужно `max(height, 1)`
-- [ ] update `model_test.go`: тест что начальная высота textarea = 1
-- [ ] update `model_test.go`: тест что после ввода длинного текста (> width) высота увеличивается
-- [ ] update `model_test.go`: тест что высота не превышает MaxHeight (3)
-- [ ] run tests (`go test ./...`) — must pass
+- [x] в `newModel()`: изменить `ta.SetHeight(3)` на `ta.SetHeight(1)` — начинаем с 1 строки; `ta.MaxHeight = 3` оставить
+- [x] в `Update()`: после обновления textarea в блоке `stateInput` — вычислить нужную высоту через `m.textArea.LineInfo().Height` и вызвать `m.textArea.SetHeight()` если высота изменилась
+- [x] обработать edge case: пустой textarea (Value() == "") — `LineInfo().Height` может вернуть 0, нужно `max(height, 1)`
+- [x] update `model_test.go`: тест что начальная высота textarea = 1
+- [x] update `model_test.go`: тест что после ввода длинного текста (> width) высота увеличивается
+- [x] update `model_test.go`: тест что высота не превышает MaxHeight (3)
+- [x] run tests (`go test ./...`) — must pass
 
 ### Refactor 1, Task 1: Cobra native mutually exclusive flags (`cmd/root.go`)
 

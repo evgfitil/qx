@@ -86,7 +86,7 @@ func newModel(opts RunOptions) Model {
 	ta := newTextArea(opts.Theme)
 	ta.Placeholder = "describe the command you need..."
 	ta.MaxHeight = 3
-	ta.SetHeight(3)
+	ta.SetHeight(1)
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
@@ -234,6 +234,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.textArea, cmd = m.textArea.Update(msg)
 		cmds = append(cmds, cmd)
+	}
+
+	if m.state == stateInput {
+		needed := m.textArea.LineInfo().Height
+		if needed < 1 {
+			needed = 1
+		}
+		if needed != m.textArea.Height() {
+			m.textArea.SetHeight(needed)
+		}
 	}
 
 	if m.state == stateSelect {

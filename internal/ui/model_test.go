@@ -1224,6 +1224,54 @@ func TestNewSelectorModelWithRendererAwareTheme(t *testing.T) {
 	}
 }
 
+// --- Textarea auto-resize tests (Bug 3) ---
+
+func TestTextareaInitialHeight(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	if m.textArea.Height() != 1 {
+		t.Errorf("initial Height() = %d, want 1", m.textArea.Height())
+	}
+}
+
+func TestTextareaGrowsOnLongInput(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	// Set width so wrapping is predictable (textarea effective width ~15 chars)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 20, Height: 40})
+	m = updated.(Model)
+
+	// Set text that exceeds the effective width and triggers wrapping
+	m.textArea.SetValue("this is a long text that should wrap to multiple lines")
+
+	// Trigger update to run auto-resize
+	updated, _ = m.Update(nil)
+	m = updated.(Model)
+
+	if m.textArea.Height() < 2 {
+		t.Errorf("Height() = %d after long text, want >= 2", m.textArea.Height())
+	}
+}
+
+func TestTextareaHeightCappedAtMaxHeight(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	// Set narrow width so text wraps aggressively
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 10, Height: 40})
+	m = updated.(Model)
+
+	// Set very long text that would wrap to many lines
+	m.textArea.SetValue("this is a very very very long text that should wrap to many many lines well beyond three")
+
+	// Trigger update to run auto-resize
+	updated, _ = m.Update(nil)
+	m = updated.(Model)
+
+	if m.textArea.Height() > 3 {
+		t.Errorf("Height() = %d, want <= 3 (MaxHeight)", m.textArea.Height())
+	}
+}
+
 var errTest = testError("test error")
 
 type testError string
