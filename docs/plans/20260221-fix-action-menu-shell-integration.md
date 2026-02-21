@@ -67,9 +67,9 @@ result=$("$qx_cmd" --query "$READLINE_LINE" </dev/tty 2>/dev/tty)
 
 ### Task 3: Verify acceptance criteria
 
-- [ ] verify: все комбинации stdout/stderr/actionMenu работают корректно
-- [ ] run full test suite (`go test ./...`)
-- [ ] build binary (`go build -o qx .`)
+- [x] verify: все комбинации stdout/stderr/actionMenu работают корректно
+- [x] run full test suite (`go test ./...`)
+- [x] build binary (`go build -o qx .`)
 
 ## Technical Details
 
