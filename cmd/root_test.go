@@ -716,7 +716,8 @@ func TestHandleSelectedCommand_ActionMenuFalse_PrintsWithoutMenu(t *testing.T) {
 }
 
 func TestRunInteractive_ConfigError_PrintsToStderr(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	origStderr := os.Stderr
 	r, w, _ := os.Pipe()
