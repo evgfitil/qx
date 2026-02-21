@@ -45,9 +45,9 @@ func TestGenerateCommands_EmptyPipeContextSkipsGuard(t *testing.T) {
 	defer func() { forceSend = origForceSend }()
 	forceSend = false
 
-	// Point config to a nonexistent directory so config.Load() always fails,
-	// regardless of the developer's local environment.
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	// Isolate from developer's real config so config.Load() always fails.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	// With empty pipe context, only the query is checked.
 	// Should pass guard check and fail later at config.Load().
@@ -94,7 +94,8 @@ func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 func TestRunInteractive_MultilineQueryDoesNotPanic(t *testing.T) {
 	// Smoke test: runInteractive with multiline query (line continuations)
 	// should not panic. Config error is expected in test environment.
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	multilineQuery := "ps aux \\\n\t| grep nginx \\\n\t| sort"
 
@@ -106,7 +107,8 @@ func TestRunInteractive_MultilineQueryDoesNotPanic(t *testing.T) {
 
 func TestRunInteractive_SimpleQueryDoesNotPanic(t *testing.T) {
 	// Smoke test: runInteractive with a simple query should not panic.
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	err := runInteractive("list all running containers", "")
 	if err == nil {
@@ -436,7 +438,8 @@ func TestRunContinue_WithHistory(t *testing.T) {
 
 	// runContinue will try to load config and create LLM provider,
 	// which will fail in test environment. That's expected.
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	err := runContinue("only go files", "")
 	if err == nil {
