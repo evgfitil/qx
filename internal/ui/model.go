@@ -27,6 +27,7 @@ const (
 const (
 	maxHeightPercent = 40
 	minHeight        = 5
+	reservedLines    = 4 // border top + textarea + counter + border bottom
 	generateTimeout  = 60 * time.Second
 )
 
@@ -44,9 +45,11 @@ type Model struct {
 	spinner       spinner.Model
 	commands      []string
 	filtered      []string
+	filteredIdx   []int
 	cursor        int
 	scrollOffset  int
 	selected      string
+	prevFilter    string
 	err           error
 	llmConfig     llm.Config
 	forceSend     bool
@@ -120,6 +123,11 @@ func newSelectorModel(items []string, display func(int) string, theme Theme) Mod
 	s.Spinner = spinner.Dot
 	s.Style = theme.MutedStyle()
 
+	idx := make([]int, len(items))
+	for i := range items {
+		idx[i] = i
+	}
+
 	return Model{
 		state:         stateSelect,
 		theme:         theme,
@@ -129,6 +137,7 @@ func newSelectorModel(items []string, display func(int) string, theme Theme) Mod
 		selectorMode:  true,
 		items:         items,
 		filtered:      items,
+		filteredIdx:   idx,
 		displayFn:     display,
 		selectedIndex: -1,
 	}
@@ -162,6 +171,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyEnter:
 			return m.handleEnter()
+
+		case tea.KeyUp:
+			if m.state == stateSelect {
+				m.moveCursor(-1)
+				return m, nil
+			}
+
+		case tea.KeyDown:
+			if m.state == stateSelect {
+				m.moveCursor(1)
+				return m, nil
+			}
 		}
 
 	case commandsMsg:
@@ -172,8 +193,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.commands = msg.commands
 		m.filtered = msg.commands
+		m.filteredIdx = make([]int, len(msg.commands))
+		for i := range msg.commands {
+			m.filteredIdx[i] = i
+		}
 		m.cursor = 0
 		m.scrollOffset = 0
+
+		if len(msg.commands) == 1 {
+			m.selected = msg.commands[0]
+			m.state = stateDone
+			m.quitting = true
+			return m, tea.Quit
+		}
+
 		m.state = stateSelect
 		return m, nil
 
@@ -191,31 +224,51 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
+	if m.state == stateSelect {
+		if current := m.textArea.Value(); current != m.prevFilter {
+			m.prevFilter = current
+			m.applyFilter()
+		}
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
 func (m Model) handleEnter() (tea.Model, tea.Cmd) {
-	if m.state != stateInput {
-		return m, nil
+	switch m.state {
+	case stateInput:
+		query := strings.TrimSpace(m.textArea.Value())
+		if query == "" {
+			return m, nil
+		}
+
+		if err := guard.CheckQuery(query, m.forceSend); err != nil {
+			m.err = err
+			return m, nil
+		}
+
+		m.state = stateLoading
+		m.originalQuery = query
+		m.err = nil
+		return m, tea.Batch(
+			m.spinner.Tick,
+			generateCommands(query, m.llmConfig, m.pipeContext),
+		)
+
+	case stateSelect:
+		if len(m.filtered) == 0 {
+			return m, nil
+		}
+		if m.selectorMode {
+			m.selectedIndex = m.filteredIdx[m.cursor]
+		}
+		m.selected = m.filtered[m.cursor]
+		m.state = stateDone
+		m.quitting = true
+		return m, tea.Quit
 	}
 
-	query := strings.TrimSpace(m.textArea.Value())
-	if query == "" {
-		return m, nil
-	}
-
-	if err := guard.CheckQuery(query, m.forceSend); err != nil {
-		m.err = err
-		return m, nil
-	}
-
-	m.state = stateLoading
-	m.originalQuery = query
-	m.err = nil
-	return m, tea.Batch(
-		m.spinner.Tick,
-		generateCommands(query, m.llmConfig, m.pipeContext),
-	)
+	return m, nil
 }
 
 func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd {
@@ -239,6 +292,74 @@ func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd 
 
 		return commandsMsg{commands: commands}
 	}
+}
+
+func (m *Model) moveCursor(delta int) {
+	if len(m.filtered) == 0 {
+		return
+	}
+	m.cursor += delta
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	if m.cursor >= len(m.filtered) {
+		m.cursor = len(m.filtered) - 1
+	}
+	m.adjustScroll()
+}
+
+func (m *Model) adjustScroll() {
+	visible := m.visibleItemCount()
+	if visible <= 0 {
+		return
+	}
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
+	}
+}
+
+func (m Model) visibleItemCount() int {
+	visible := m.maxHeight - reservedLines
+	if visible < 1 {
+		visible = 1
+	}
+	return visible
+}
+
+func (m *Model) applyFilter() {
+	query := strings.ToLower(strings.TrimSpace(m.textArea.Value()))
+	m.filtered = nil
+	m.filteredIdx = nil
+
+	if m.selectorMode {
+		for i := range m.items {
+			display := m.displayFn(i)
+			if query == "" || strings.Contains(strings.ToLower(display), query) {
+				m.filtered = append(m.filtered, m.items[i])
+				m.filteredIdx = append(m.filteredIdx, i)
+			}
+		}
+	} else {
+		for i, cmd := range m.commands {
+			if query == "" || strings.Contains(strings.ToLower(cmd), query) {
+				m.filtered = append(m.filtered, cmd)
+				m.filteredIdx = append(m.filteredIdx, i)
+			}
+		}
+	}
+
+	m.cursor = 0
+	m.scrollOffset = 0
+}
+
+func (m Model) getDisplayText(filteredIndex int) string {
+	if m.selectorMode && m.displayFn != nil {
+		return m.displayFn(m.filteredIdx[filteredIndex])
+	}
+	return m.filtered[filteredIndex]
 }
 
 // Result returns the outcome of TUI interaction.

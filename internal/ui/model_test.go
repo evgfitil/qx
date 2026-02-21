@@ -463,6 +463,479 @@ func TestCommandsMsgErrorPreservesQuery(t *testing.T) {
 	}
 }
 
+// --- Selector state tests (Task 7) ---
+
+func newSelectModel(commands []string) Model {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+	updated, _ := m.Update(commandsMsg{commands: commands})
+	return updated.(Model)
+}
+
+func TestSelectorNavigationDown(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model := updated.(Model)
+
+	if model.cursor != 1 {
+		t.Errorf("cursor = %d, want 1 after Down", model.cursor)
+	}
+}
+
+func TestSelectorNavigationUp(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.cursor = 2
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model := updated.(Model)
+
+	if model.cursor != 1 {
+		t.Errorf("cursor = %d, want 1 after Up", model.cursor)
+	}
+}
+
+func TestSelectorNavigationUpAtTop(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model := updated.(Model)
+
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 (should stay at top)", model.cursor)
+	}
+}
+
+func TestSelectorNavigationDownAtBottom(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.cursor = 2
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model := updated.(Model)
+
+	if model.cursor != 2 {
+		t.Errorf("cursor = %d, want 2 (should stay at bottom)", model.cursor)
+	}
+}
+
+func TestSelectorNavigationMultipleDown(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	for i := 0; i < 5; i++ {
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = result.(Model)
+	}
+
+	if m.cursor != 2 {
+		t.Errorf("cursor = %d, want 2 (clamped to last item)", m.cursor)
+	}
+}
+
+func TestSelectorFilter(t *testing.T) {
+	m := newSelectModel([]string{"ls -la", "find . -name '*.go'", "grep error log.txt"})
+
+	m.textArea.SetValue("find")
+	// Trigger filter by simulating a text change
+	m.prevFilter = ""
+	m.applyFilter()
+
+	if len(m.filtered) != 1 {
+		t.Errorf("filtered count = %d, want 1 for filter 'find'", len(m.filtered))
+	}
+	if m.filtered[0] != "find . -name '*.go'" {
+		t.Errorf("filtered[0] = %q, want %q", m.filtered[0], "find . -name '*.go'")
+	}
+}
+
+func TestSelectorFilterCaseInsensitive(t *testing.T) {
+	m := newSelectModel([]string{"LS -LA", "find files", "GREP pattern"})
+
+	m.textArea.SetValue("grep")
+	m.applyFilter()
+
+	if len(m.filtered) != 1 {
+		t.Errorf("filtered count = %d, want 1 for case-insensitive filter 'grep'", len(m.filtered))
+	}
+	if m.filtered[0] != "GREP pattern" {
+		t.Errorf("filtered[0] = %q, want %q", m.filtered[0], "GREP pattern")
+	}
+}
+
+func TestSelectorFilterResetsCursor(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.cursor = 2
+
+	m.textArea.SetValue("cmd")
+	m.applyFilter()
+
+	if m.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 after filter change", m.cursor)
+	}
+}
+
+func TestSelectorFilterEmptyShowsAll(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	m.textArea.SetValue("")
+	m.applyFilter()
+
+	if len(m.filtered) != 3 {
+		t.Errorf("filtered count = %d, want 3 for empty filter", len(m.filtered))
+	}
+}
+
+func TestSelectorFilterNoMatch(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	m.textArea.SetValue("zzz")
+	m.applyFilter()
+
+	if len(m.filtered) != 0 {
+		t.Errorf("filtered count = %d, want 0 for non-matching filter", len(m.filtered))
+	}
+}
+
+func TestSelectorEnterSelectsCommand(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.cursor = 1
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
+	}
+	if model.selected != "cmd2" {
+		t.Errorf("selected = %q, want %q", model.selected, "cmd2")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
+	}
+}
+
+func TestSelectorEnterWithEmptyFilteredList(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+	m.filtered = nil
+	m.filteredIdx = nil
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (should stay when nothing to select)", model.state)
+	}
+	if model.selected != "" {
+		t.Errorf("selected = %q, want empty", model.selected)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil when nothing to select")
+	}
+}
+
+func TestSelectorEnterAfterFilter(t *testing.T) {
+	m := newSelectModel([]string{"ls -la", "find . -name '*.go'", "grep error log.txt"})
+
+	m.textArea.SetValue("grep")
+	m.applyFilter()
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
+	}
+	if model.selected != "grep error log.txt" {
+		t.Errorf("selected = %q, want %q", model.selected, "grep error log.txt")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
+	}
+}
+
+func TestAutoSelectSingleCommand(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+
+	updated, cmd := m.Update(commandsMsg{commands: []string{"only-cmd"}})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d) for auto-select", model.state, stateDone)
+	}
+	if model.selected != "only-cmd" {
+		t.Errorf("selected = %q, want %q", model.selected, "only-cmd")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit for auto-select")
+	}
+}
+
+func TestAutoSelectDoesNotTriggerForMultipleCommands(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+
+	updated, cmd := m.Update(commandsMsg{commands: []string{"cmd1", "cmd2"}})
+	model := updated.(Model)
+
+	if model.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d)", model.state, stateSelect)
+	}
+	if model.selected != "" {
+		t.Errorf("selected = %q, want empty", model.selected)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil (no auto-quit)")
+	}
+}
+
+func TestSelectorResultExtraction(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+	m.cursor = 1
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	result := model.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatalf("result type = %T, want SelectedResult", result)
+	}
+	if selected.Command != "cmd2" {
+		t.Errorf("Command = %q, want %q", selected.Command, "cmd2")
+	}
+}
+
+func TestSelectorCancelledResult(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	if _, ok := result.(CancelledResult); !ok {
+		t.Fatalf("result type = %T, want CancelledResult", result)
+	}
+}
+
+func TestSelectorModeEnterSetsIndex(t *testing.T) {
+	items := []string{"item-a", "item-b", "item-c"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
+	m.cursor = 2
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.selectedIndex != 2 {
+		t.Errorf("selectedIndex = %d, want 2", model.selectedIndex)
+	}
+	if model.selected != "item-c" {
+		t.Errorf("selected = %q, want %q", model.selected, "item-c")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
+	}
+}
+
+func TestSelectorModeFilteredEnterSetsCorrectIndex(t *testing.T) {
+	items := []string{"apple", "banana", "cherry"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
+
+	m.textArea.SetValue("cherry")
+	m.applyFilter()
+
+	if len(m.filtered) != 1 {
+		t.Fatalf("filtered count = %d, want 1", len(m.filtered))
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.selectedIndex != 2 {
+		t.Errorf("selectedIndex = %d, want 2 (original index of cherry)", model.selectedIndex)
+	}
+}
+
+func TestSelectorViewContainsCommands(t *testing.T) {
+	m := newSelectModel([]string{"ls -la", "find .", "tree"})
+	m.width = 80
+	m.maxHeight = 10
+
+	view := m.View()
+
+	if !strings.Contains(view, "ls -la") {
+		t.Error("View() should contain first command")
+	}
+	if !strings.Contains(view, "find .") {
+		t.Error("View() should contain second command")
+	}
+	if !strings.Contains(view, "tree") {
+		t.Error("View() should contain third command")
+	}
+}
+
+func TestSelectorViewContainsPointer(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+	m.width = 80
+	m.maxHeight = 10
+
+	view := m.View()
+
+	if !strings.Contains(view, DefaultTheme().Pointer) {
+		t.Errorf("View() should contain pointer %q", DefaultTheme().Pointer)
+	}
+}
+
+func TestSelectorViewContainsCounter(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.width = 80
+	m.maxHeight = 10
+
+	view := m.View()
+
+	if !strings.Contains(view, "3/3") {
+		t.Error("View() should contain counter '3/3'")
+	}
+}
+
+func TestSelectorViewFilteredCounter(t *testing.T) {
+	m := newSelectModel([]string{"ls -la", "find . -name '*.go'", "grep error"})
+	m.width = 80
+	m.maxHeight = 10
+	m.textArea.SetValue("find")
+	m.applyFilter()
+
+	view := m.View()
+
+	if !strings.Contains(view, "1/3") {
+		t.Error("View() should contain counter '1/3' after filtering")
+	}
+}
+
+func TestSelectorScrollOffset(t *testing.T) {
+	commands := make([]string, 20)
+	for i := range commands {
+		commands[i] = "cmd" + string(rune('a'+i))
+	}
+	m := newSelectModel(commands)
+	m.maxHeight = 6 // reservedLines=4, so visible=2
+
+	// Move cursor down past visible area
+	for i := 0; i < 5; i++ {
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = result.(Model)
+	}
+
+	if m.cursor != 5 {
+		t.Errorf("cursor = %d, want 5", m.cursor)
+	}
+	if m.scrollOffset < 1 {
+		t.Errorf("scrollOffset = %d, should be > 0 when cursor exceeds visible area", m.scrollOffset)
+	}
+}
+
+func TestSelectorScrollOffsetUp(t *testing.T) {
+	commands := make([]string, 20)
+	for i := range commands {
+		commands[i] = "cmd" + string(rune('a'+i))
+	}
+	m := newSelectModel(commands)
+	m.maxHeight = 6 // visible = 2
+	m.cursor = 10
+	m.scrollOffset = 9
+
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = result.(Model)
+
+	if m.cursor != 9 {
+		t.Errorf("cursor = %d, want 9", m.cursor)
+	}
+	if m.scrollOffset != 9 {
+		t.Errorf("scrollOffset = %d, want 9", m.scrollOffset)
+	}
+}
+
+func TestVisibleItemCount(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.maxHeight = 10
+
+	got := m.visibleItemCount()
+	want := 10 - reservedLines
+	if got != want {
+		t.Errorf("visibleItemCount() = %d, want %d", got, want)
+	}
+}
+
+func TestVisibleItemCountMinimumOne(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.maxHeight = 3 // less than reservedLines
+
+	got := m.visibleItemCount()
+	if got < 1 {
+		t.Errorf("visibleItemCount() = %d, want at least 1", got)
+	}
+}
+
+func TestNavigationWithEmptyFilteredList(t *testing.T) {
+	m := newSelectModel([]string{"cmd1"})
+	m.filtered = nil
+	m.filteredIdx = nil
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model := updated.(Model)
+
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 with empty filtered list", model.cursor)
+	}
+}
+
+func TestSelectorFilterWithDisplayFn(t *testing.T) {
+	items := []string{"a", "b", "c"}
+	display := func(i int) string {
+		names := []string{"alpha-item", "beta-item", "charlie-item"}
+		return names[i]
+	}
+	m := newSelectorModel(items, display, DefaultTheme())
+
+	m.textArea.SetValue("beta")
+	m.applyFilter()
+
+	if len(m.filtered) != 1 {
+		t.Errorf("filtered count = %d, want 1 for filter 'beta'", len(m.filtered))
+	}
+	if m.filteredIdx[0] != 1 {
+		t.Errorf("filteredIdx[0] = %d, want 1 (original index of 'b')", m.filteredIdx[0])
+	}
+}
+
+func TestGetDisplayText(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	got := m.getDisplayText(1)
+	if got != "cmd2" {
+		t.Errorf("getDisplayText(1) = %q, want %q", got, "cmd2")
+	}
+}
+
+func TestGetDisplayTextSelectorMode(t *testing.T) {
+	items := []string{"a", "b", "c"}
+	display := func(i int) string {
+		names := []string{"alpha", "beta", "charlie"}
+		return names[i]
+	}
+	m := newSelectorModel(items, display, DefaultTheme())
+
+	got := m.getDisplayText(1)
+	if got != "beta" {
+		t.Errorf("getDisplayText(1) = %q, want %q", got, "beta")
+	}
+}
+
 var errTest = testError("test error")
 
 type testError string
