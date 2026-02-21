@@ -494,27 +494,65 @@ func TestRun_ContinueWithoutQueryArg(t *testing.T) {
 }
 
 func TestRun_MutuallyExclusiveFlags(t *testing.T) {
+	withTempHistoryStore(t)
+	resetRootCmdFlags(t)
+
+	rootCmd.SetArgs([]string{"--last", "--history"})
+
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for combined --last and --history")
+	}
+	if !strings.Contains(err.Error(), "if any flags in the group") {
+		t.Errorf("expected cobra mutual exclusion error, got: %q", err.Error())
+	}
+}
+
+func TestRun_SingleFlags_NoMutualExclusionError(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"last only", []string{"--last"}},
+		{"history only", []string{"--history"}},
+		{"continue with query", []string{"--continue", "refine"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withTempHistoryStore(t)
+			resetRootCmdFlags(t)
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("OPENAI_API_KEY", "")
+
+			rootCmd.SetArgs(tt.args)
+
+			err := rootCmd.Execute()
+			if err != nil && strings.Contains(err.Error(), "if any flags in the group") {
+				t.Errorf("single flag should not trigger mutual exclusion error: %v", err)
+			}
+		})
+	}
+}
+
+// resetRootCmdFlags saves and restores flag state for rootCmd.
+// Must be called in tests that use rootCmd.Execute() with SetArgs.
+func resetRootCmdFlags(t *testing.T) {
+	t.Helper()
 	origLast := lastFlag
 	origHistory := historyFlag
 	origContinue := continueFlag
 	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
 		lastFlag = origLast
 		historyFlag = origHistory
 		continueFlag = origContinue
+		for _, name := range []string{"last", "history", "continue"} {
+			if f := rootCmd.Flags().Lookup(name); f != nil {
+				f.Changed = false
+			}
+		}
 	})
-
-	lastFlag = true
-	historyFlag = true
-	continueFlag = false
-
-	err := run(rootCmd, []string{})
-	if err == nil {
-		t.Fatal("expected error for combined --last and --history")
-	}
-	want := "--last, --history, and --continue are mutually exclusive"
-	if got := err.Error(); got != want {
-		t.Errorf("error = %q, want %q", got, want)
-	}
 }
 
 func TestRunContinue_WithHistory(t *testing.T) {

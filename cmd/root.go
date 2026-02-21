@@ -73,6 +73,8 @@ func init() {
 	rootCmd.Flags().BoolVar(&lastFlag, "last", false, "show last selected command and open action menu")
 	rootCmd.Flags().BoolVar(&historyFlag, "history", false, "browse command history with interactive picker")
 	rootCmd.Flags().BoolVar(&continueFlag, "continue", false, "refine the last command with a new query")
+
+	rootCmd.MarkFlagsMutuallyExclusive("last", "history", "continue")
 }
 
 // Execute runs the root command
@@ -88,20 +90,6 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if shellIntegration != "" {
 		return handleShellIntegration(shellIntegration)
-	}
-
-	flagCount := 0
-	if lastFlag {
-		flagCount++
-	}
-	if historyFlag {
-		flagCount++
-	}
-	if continueFlag {
-		flagCount++
-	}
-	if flagCount > 1 {
-		return fmt.Errorf("--last, --history, and --continue are mutually exclusive")
 	}
 
 	if lastFlag {

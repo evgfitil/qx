@@ -185,11 +185,11 @@ rootCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "refine the last
 
 ### Refactor 1, Task 1: Cobra native mutually exclusive flags (`cmd/root.go`)
 
-- [ ] в `init()`: добавить `rootCmd.MarkFlagsMutuallyExclusive("last", "history", "continue")` после определения флагов
-- [ ] в `run()`: удалить весь блок `flagCount` (строки 93-105)
-- [ ] update `root_test.go`: обновить тесты взаимной исключительности — проверить что cobra возвращает ошибку при `--last --history` (формат ошибки cobra отличается от текущего)
-- [ ] update `root_test.go`: проверить что одиночные флаги (`--last`, `--history`, `--continue`) работают без ошибок
-- [ ] run tests (`go test ./...`) — must pass
+- [x] в `init()`: добавить `rootCmd.MarkFlagsMutuallyExclusive("last", "history", "continue")` после определения флагов
+- [x] в `run()`: удалить весь блок `flagCount` (строки 93-105)
+- [x] update `root_test.go`: обновить тесты взаимной исключительности — проверить что cobra возвращает ошибку при `--last --history` (формат ошибки cobra отличается от текущего)
+- [x] update `root_test.go`: проверить что одиночные флаги (`--last`, `--history`, `--continue`) работают без ошибок
+- [x] run tests (`go test ./...`) — must pass
 
 ### Refactor 2, Task 1: Добавить короткие флаги (`cmd/root.go`)
 
