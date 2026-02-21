@@ -1083,6 +1083,55 @@ func TestRunSelectorCancelledIndex(t *testing.T) {
 	}
 }
 
+func TestEmptyCommandList(t *testing.T) {
+	m := newModel(RunOptions{InitialQuery: "test query", Theme: DefaultTheme()})
+	m.state = stateLoading
+
+	updated, _ := m.Update(commandsMsg{commands: []string{}})
+	model := updated.(Model)
+
+	if model.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d)", model.state, stateSelect)
+	}
+	if len(model.filtered) != 0 {
+		t.Errorf("filtered = %v, want empty", model.filtered)
+	}
+}
+
+func TestEmptyCommandListEnterDoesNothing(t *testing.T) {
+	m := newModel(RunOptions{InitialQuery: "test query", Theme: DefaultTheme()})
+	m.state = stateSelect
+	m.commands = []string{}
+	m.filtered = []string{}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d) — Enter should be no-op with no items", model.state, stateSelect)
+	}
+	if cmd != nil {
+		t.Errorf("cmd = %v, want nil", cmd)
+	}
+}
+
+func TestEmptyCommandListEscCancels(t *testing.T) {
+	m := newModel(RunOptions{InitialQuery: "test query", Theme: DefaultTheme()})
+	m.state = stateSelect
+	m.commands = []string{}
+	m.filtered = []string{}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
+	}
+	if model.selected != "" {
+		t.Errorf("selected = %q, want empty (cancelled)", model.selected)
+	}
+}
+
 var errTest = testError("test error")
 
 type testError string

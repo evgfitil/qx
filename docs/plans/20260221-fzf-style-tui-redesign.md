@@ -243,11 +243,11 @@ All fields optional with fzf-like defaults.
 
 ### Task 11: Verify acceptance criteria
 
-- [ ] verify all requirements from Overview are implemented
-- [ ] verify edge cases: empty query, LLM error, no commands generated, single command
-- [ ] run full test suite (`go test ./...`)
-- [ ] run linter (`golangci-lint run`) — all issues must be fixed
-- [ ] verify cleanup behavior: TUI content disappears after selection
+- [x] verify all requirements from Overview are implemented
+- [x] verify edge cases: empty query, LLM error, no commands generated, single command
+- [x] run full test suite (`go test ./...`)
+- [x] run linter (`golangci-lint run`) — all issues must be fixed
+- [x] verify cleanup behavior: TUI content disappears after selection
 
 ### Task 12: [Final] Update documentation
 
