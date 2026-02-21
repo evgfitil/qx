@@ -138,16 +138,16 @@ All fields optional with fzf-like defaults.
 
 ### Task 2: Add theme and action\_menu to config (`internal/config/config.go`)
 
-- [ ] add `ThemeConfig` struct with mapstructure tags matching config keys
-- [ ] add `ActionMenu bool` field to Config
-- [ ] add `Theme ThemeConfig` field to Config
-- [ ] set viper defaults for all theme fields (matching DefaultTheme)
-- [ ] set viper default for `action_menu: false`
-- [ ] implement `ThemeConfig.ToTheme()` converter to `ui.Theme`
-- [ ] write tests for config loading with theme section present
-- [ ] write tests for config loading without theme section (defaults used)
-- [ ] write tests for action\_menu field loading
-- [ ] run tests — must pass before next task
+- [x] add `ThemeConfig` struct with mapstructure tags matching config keys
+- [x] add `ActionMenu bool` field to Config
+- [x] add `Theme ThemeConfig` field to Config
+- [x] set viper defaults for all theme fields (matching DefaultTheme)
+- [x] set viper default for `action_menu: false`
+- [x] implement `ThemeConfig.ToTheme()` converter to `ui.Theme`
+- [x] write tests for config loading with theme section present
+- [x] write tests for config loading without theme section (defaults used)
+- [x] write tests for action\_menu field loading
+- [x] run tests — must pass before next task
 
 ### Task 3: Create result types and run scaffolding (`internal/ui/result.go`, `internal/ui/run.go`)
 
