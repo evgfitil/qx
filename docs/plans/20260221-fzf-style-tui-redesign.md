@@ -151,14 +151,14 @@ All fields optional with fzf-like defaults.
 
 ### Task 3: Create result types and run scaffolding (`internal/ui/result.go`, `internal/ui/run.go`)
 
-- [ ] define `Result` interface with `isResult()` marker method
-- [ ] define `SelectedResult{Command, Query string}` implementing Result
-- [ ] define `CancelledResult{Query string}` implementing Result
-- [ ] define `RunOptions` struct: InitialQuery, LLMConfig, ForceSend, PipeContext, Theme
-- [ ] implement `Run(opts RunOptions) (Result, error)` skeleton — creates model, runs bubbletea Program with `tea.WithOutput(tty)`, `tea.WithInputTTY()`, NO `tea.WithAltScreen()`
-- [ ] implement `RunSelector(items []string, display func(int) string, theme Theme) (int, error)` skeleton
-- [ ] write tests for SelectedResult and CancelledResult construction
-- [ ] run tests — must pass before next task
+- [x] define `Result` interface with `isResult()` marker method
+- [x] define `SelectedResult{Command, Query string}` implementing Result
+- [x] define `CancelledResult{Query string}` implementing Result
+- [x] define `RunOptions` struct: InitialQuery, LLMConfig, ForceSend, PipeContext, Theme
+- [x] implement `Run(opts RunOptions) (Result, error)` skeleton — creates model, runs bubbletea Program with `tea.WithOutput(tty)`, `tea.WithInputTTY()`, NO `tea.WithAltScreen()`
+- [x] implement `RunSelector(items []string, display func(int) string, theme Theme) (int, error)` skeleton
+- [x] write tests for SelectedResult and CancelledResult construction
+- [x] run tests — must pass before next task
 
 ### Task 4: Core model with state machine (`internal/ui/model.go`)
 
