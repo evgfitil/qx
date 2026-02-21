@@ -1,12 +1,17 @@
 package ui
 
 import (
+	"context"
+	"strings"
+	"time"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
 )
 
@@ -22,6 +27,7 @@ const (
 const (
 	maxHeightPercent = 40
 	minHeight        = 5
+	generateTimeout  = 60 * time.Second
 )
 
 // commandsMsg is sent when LLM returns generated commands.
@@ -153,6 +159,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = stateDone
 			m.quitting = true
 			return m, tea.Quit
+
+		case tea.KeyEnter:
+			return m.handleEnter()
 		}
 
 	case commandsMsg:
@@ -176,12 +185,60 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if m.state == stateInput || m.state == stateSelect {
+		var cmd tea.Cmd
+		m.textArea, cmd = m.textArea.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
-// View implements tea.Model.
-func (m Model) View() string {
-	return ""
+func (m Model) handleEnter() (tea.Model, tea.Cmd) {
+	if m.state != stateInput {
+		return m, nil
+	}
+
+	query := strings.TrimSpace(m.textArea.Value())
+	if query == "" {
+		return m, nil
+	}
+
+	if err := guard.CheckQuery(query, m.forceSend); err != nil {
+		m.err = err
+		return m, nil
+	}
+
+	m.state = stateLoading
+	m.originalQuery = query
+	m.err = nil
+	return m, tea.Batch(
+		m.spinner.Tick,
+		generateCommands(query, m.llmConfig, m.pipeContext),
+	)
+}
+
+func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd {
+	return func() tea.Msg {
+		provider, err := llm.NewProvider(cfg)
+		if err != nil {
+			return commandsMsg{err: err}
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), generateTimeout)
+		defer cancel()
+
+		commands, err := provider.Generate(ctx, query, cfg.Count, pipeContext, nil)
+		if err != nil {
+			return commandsMsg{err: err}
+		}
+
+		for i, cmd := range commands {
+			commands[i] = guard.SanitizeOutput(cmd)
+		}
+
+		return commandsMsg{commands: commands}
+	}
 }
 
 // Result returns the outcome of TUI interaction.

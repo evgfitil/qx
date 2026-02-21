@@ -176,14 +176,14 @@ All fields optional with fzf-like defaults.
 
 ### Task 5: Input state (`internal/ui/model.go` Update, `internal/ui/view.go`)
 
-- [ ] implement input state key handling in Update: Enter submits query, transitions to stateLoading
-- [ ] implement textarea setup: single-line, themed prompt, placeholder "describe the command you need..."
-- [ ] implement LLM generation as tea.Cmd (same pattern as current tui/model.go)
-- [ ] implement input state View: textarea + optional error message
-- [ ] write tests for Enter with non-empty query → stateLoading transition
-- [ ] write tests for Enter with empty query → stays in stateInput
-- [ ] write tests for guard.CheckQuery error display
-- [ ] run tests — must pass before next task
+- [x] implement input state key handling in Update: Enter submits query, transitions to stateLoading
+- [x] implement textarea setup: single-line, themed prompt, placeholder "describe the command you need..."
+- [x] implement LLM generation as tea.Cmd (same pattern as current tui/model.go)
+- [x] implement input state View: textarea + optional error message
+- [x] write tests for Enter with non-empty query → stateLoading transition
+- [x] write tests for Enter with empty query → stays in stateInput
+- [x] write tests for guard.CheckQuery error display
+- [x] run tests — must pass before next task
 
 ### Task 6: Loading state (`internal/ui/model.go` Update, `internal/ui/view.go`)
 

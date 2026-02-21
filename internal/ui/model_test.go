@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -247,6 +248,140 @@ func TestMaxHeightCalculation(t *testing.T) {
 				t.Errorf("maxHeight = %d, want %d", model.maxHeight, tt.want)
 			}
 		})
+	}
+}
+
+func TestEnterWithNonEmptyQuery(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("list files")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d)", model.state, stateLoading)
+	}
+	if model.originalQuery != "list files" {
+		t.Errorf("originalQuery = %q, want %q", model.originalQuery, "list files")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want batch of spinner.Tick + generateCommands")
+	}
+}
+
+func TestEnterWithEmptyQuery(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil for empty query")
+	}
+}
+
+func TestEnterWithWhitespaceOnlyQuery(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("   ")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil for whitespace-only query")
+	}
+}
+
+func TestEnterWithSecretDetected(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("use api_key=abcdefghijklmnopqrstuvwxyz1234")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d) when secret detected", model.state, stateInput)
+	}
+	if model.err == nil {
+		t.Error("err = nil, want guard error for detected secret")
+	}
+}
+
+func TestEnterWithSecretDetectedForceSend(t *testing.T) {
+	m := newModel(RunOptions{
+		Theme:     DefaultTheme(),
+		ForceSend: true,
+	})
+	m.textArea.SetValue("use api_key=abcdefghijklmnopqrstuvwxyz1234")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d) with forceSend", model.state, stateLoading)
+	}
+	if model.err != nil {
+		t.Errorf("err = %v, want nil with forceSend", model.err)
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want batch command for loading")
+	}
+}
+
+func TestEnterClearsError(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.err = errTest
+	m.textArea.SetValue("list files")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.err != nil {
+		t.Errorf("err = %v, want nil after successful submit", model.err)
+	}
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d)", model.state, stateLoading)
+	}
+}
+
+func TestInputViewShowsTextarea(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("test query")
+
+	view := m.View()
+
+	if view == "" {
+		t.Error("View() returned empty string, want textarea content")
+	}
+	if !strings.Contains(view, "test query") {
+		t.Errorf("View() does not contain query text")
+	}
+}
+
+func TestInputViewShowsError(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.err = errTest
+
+	view := m.View()
+
+	if !strings.Contains(view, "test error") {
+		t.Errorf("View() does not contain error message")
+	}
+}
+
+func TestInputViewHidesErrorWhenNil(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	view := m.View()
+
+	if strings.Contains(view, "Error:") {
+		t.Errorf("View() should not contain Error: when err is nil")
 	}
 }
 
