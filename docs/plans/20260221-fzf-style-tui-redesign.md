@@ -197,18 +197,18 @@ All fields optional with fzf-like defaults.
 
 ### Task 7: Selector state (`internal/ui/view.go`, `internal/ui/model.go`)
 
-- [ ] implement selector navigation: Up/Down arrow keys move cursor
-- [ ] implement type-to-filter: textarea in selector filters commands (case-insensitive substring match)
-- [ ] implement Enter → select command, transition to stateDone
-- [ ] implement auto-select when only 1 command
-- [ ] implement selector View: bordered box with pointer indicator, scrollable list, counter "N/M"
-- [ ] implement height-aware pagination: visible items = maxHeight - reserved lines (border + input + counter)
-- [ ] implement scroll offset tracking for lists longer than visible area
-- [ ] write tests for navigation (Up/Down within bounds)
-- [ ] write tests for filtering (type text → filtered list updates)
-- [ ] write tests for Enter → stateDone with correct selected command
-- [ ] write tests for auto-select with single command
-- [ ] run tests — must pass before next task
+- [x] implement selector navigation: Up/Down arrow keys move cursor
+- [x] implement type-to-filter: textarea in selector filters commands (case-insensitive substring match)
+- [x] implement Enter → select command, transition to stateDone
+- [x] implement auto-select when only 1 command
+- [x] implement selector View: bordered box with pointer indicator, scrollable list, counter "N/M"
+- [x] implement height-aware pagination: visible items = maxHeight - reserved lines (border + input + counter)
+- [x] implement scroll offset tracking for lists longer than visible area
+- [x] write tests for navigation (Up/Down within bounds)
+- [x] write tests for filtering (type text → filtered list updates)
+- [x] write tests for Enter → stateDone with correct selected command
+- [x] write tests for auto-select with single command
+- [x] run tests — must pass before next task
 
 ### Task 8: Done state and cleanup (`internal/ui/view.go`, `internal/ui/run.go`)
 
