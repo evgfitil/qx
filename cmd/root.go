@@ -70,7 +70,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
 	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
-	rootCmd.Flags().BoolVarP(&lastFlag, "last", "l", false, "show last selected command and open action menu")
+	rootCmd.Flags().BoolVarP(&lastFlag, "last", "l", false, "show last selected command")
 	rootCmd.Flags().BoolVar(&historyFlag, "history", false, "browse command history with interactive picker")
 	rootCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "refine the last command with a new query")
 
@@ -176,10 +176,12 @@ func handleShellIntegration(shellName string) error {
 
 // runLast loads the most recent history entry and either prints the command
 // or opens the action menu, depending on the action_menu config setting.
+// Config errors are non-fatal: action_menu defaults to false since runLast
+// does not need LLM credentials.
 func runLast() error {
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+	actionMenu := false
+	if cfg, err := config.Load(); err == nil {
+		actionMenu = cfg.ActionMenu
 	}
 
 	store, err := newHistoryStore()
@@ -195,7 +197,7 @@ func runLast() error {
 		return fmt.Errorf("failed to read history: %w", err)
 	}
 
-	return handleSelectedCommand(entry.Selected, entry.Query, entry.PipeContext, cfg.ActionMenu)
+	return handleSelectedCommand(entry.Selected, entry.Query, entry.PipeContext, actionMenu)
 }
 
 // runHistory loads all history entries and presents an interactive picker.

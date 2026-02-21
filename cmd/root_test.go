@@ -370,6 +370,39 @@ func TestRunLast_ActionMenuTrue_ShowsMenu(t *testing.T) {
 	}
 }
 
+func TestRunLast_WorksWithoutValidConfig(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	// No valid config: HOME points to empty temp dir, no API key.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := runLast()
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("runLast() should work without valid config, got: %v", err)
+	}
+	if string(out) != "find . -size +100M\n" {
+		t.Errorf("output = %q, want %q", string(out), "find . -size +100M\n")
+	}
+}
+
 func TestRunHistory_EmptyHistory(t *testing.T) {
 	withTempHistoryStore(t)
 

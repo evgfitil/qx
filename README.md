@@ -75,7 +75,7 @@ theme:
 
 Control whether the post-selection action menu appears after command selection.
 When disabled (default), the selected command is printed to stdout.
-The `--last` and `--history` subcommands always show the action menu:
+The `--history` subcommand always shows the action menu:
 
 ```yaml
 action_menu: false  # default: false
@@ -158,10 +158,10 @@ Stdin input is limited to 64KB. Content is checked for secrets before being sent
 
 ### History and follow-up
 
-Show the last selected command and open the action menu:
+Show the last selected command (action menu appears if enabled in config):
 
 ```bash
-qx --last
+qx --last    # or: qx -l
 ```
 
 Browse past queries with an interactive fuzzy picker:
@@ -173,7 +173,7 @@ qx --history
 Refine the last command with a follow-up query:
 
 ```bash
-qx --continue "make it recursive"
+qx --continue "make it recursive"    # or: qx -c "make it recursive"
 qx --continue "add verbose output"
 ```
 
