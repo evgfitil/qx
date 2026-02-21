@@ -32,11 +32,11 @@ func TestNewModelWithQuery(t *testing.T) {
 		Theme:        DefaultTheme(),
 	})
 
-	if m.state != stateLoading {
-		t.Errorf("state = %d, want stateLoading (%d)", m.state, stateLoading)
+	if m.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", m.state, stateInput)
 	}
-	if m.originalQuery != "list files" {
-		t.Errorf("originalQuery = %q, want %q", m.originalQuery, "list files")
+	if m.originalQuery != "" {
+		t.Errorf("originalQuery = %q, want empty (set only on Enter)", m.originalQuery)
 	}
 	if m.textArea.Value() != "list files" {
 		t.Errorf("textArea value = %q, want %q", m.textArea.Value(), "list files")
@@ -52,7 +52,7 @@ func TestNewModelInitReturnsBlinkForInput(t *testing.T) {
 	}
 }
 
-func TestNewModelInitReturnsTickForLoading(t *testing.T) {
+func TestNewModelInitReturnsBlinkWithQuery(t *testing.T) {
 	m := newModel(RunOptions{
 		InitialQuery: "test",
 		Theme:        DefaultTheme(),
@@ -60,7 +60,7 @@ func TestNewModelInitReturnsTickForLoading(t *testing.T) {
 	cmd := m.Init()
 
 	if cmd == nil {
-		t.Error("Init() returned nil, want spinner.Tick command")
+		t.Error("Init() returned nil, want textarea.Blink command")
 	}
 }
 
@@ -155,10 +155,8 @@ func TestCtrlCQuits(t *testing.T) {
 }
 
 func TestEscFromLoadingState(t *testing.T) {
-	m := newModel(RunOptions{
-		InitialQuery: "test query",
-		Theme:        DefaultTheme(),
-	})
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateLoading
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
@@ -256,6 +254,30 @@ func TestMaxHeightCalculation(t *testing.T) {
 func TestEnterWithNonEmptyQuery(t *testing.T) {
 	m := newModel(RunOptions{Theme: DefaultTheme()})
 	m.textArea.SetValue("list files")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d)", model.state, stateLoading)
+	}
+	if model.originalQuery != "list files" {
+		t.Errorf("originalQuery = %q, want %q", model.originalQuery, "list files")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want batch of spinner.Tick + generateCommands")
+	}
+}
+
+func TestEnterWithPrefilledQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "list files",
+		Theme:        DefaultTheme(),
+	})
+
+	if m.state != stateInput {
+		t.Fatalf("precondition: state = %d, want stateInput", m.state)
+	}
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
@@ -388,14 +410,8 @@ func TestInputViewHidesErrorWhenNil(t *testing.T) {
 }
 
 func TestEnterDuringLoadingIgnored(t *testing.T) {
-	m := newModel(RunOptions{
-		InitialQuery: "test query",
-		Theme:        DefaultTheme(),
-	})
-
-	if m.state != stateLoading {
-		t.Fatalf("precondition: state = %d, want stateLoading", m.state)
-	}
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateLoading
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
@@ -409,10 +425,8 @@ func TestEnterDuringLoadingIgnored(t *testing.T) {
 }
 
 func TestLoadingViewShowsSpinnerText(t *testing.T) {
-	m := newModel(RunOptions{
-		InitialQuery: "test",
-		Theme:        DefaultTheme(),
-	})
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateLoading
 
 	view := m.View()
 
@@ -422,10 +436,8 @@ func TestLoadingViewShowsSpinnerText(t *testing.T) {
 }
 
 func TestLoadingViewNotEmpty(t *testing.T) {
-	m := newModel(RunOptions{
-		InitialQuery: "test",
-		Theme:        DefaultTheme(),
-	})
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateLoading
 
 	view := m.View()
 
@@ -473,10 +485,14 @@ func TestCommandsMsgErrorPreservesQuery(t *testing.T) {
 		InitialQuery: "my query",
 		Theme:        DefaultTheme(),
 	})
-	m.state = stateLoading
 
-	updated, _ := m.Update(commandsMsg{err: errTest})
+	// Press Enter to set originalQuery and transition to stateLoading
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
+
+	// Simulate error from LLM
+	updated, _ = model.Update(commandsMsg{err: errTest})
+	model = updated.(Model)
 
 	if model.originalQuery != "my query" {
 		t.Errorf("originalQuery = %q, want %q after error", model.originalQuery, "my query")
@@ -1000,9 +1016,13 @@ func TestResultSelectedFromInput(t *testing.T) {
 		Theme:        DefaultTheme(),
 	})
 
-	// Simulate receiving commands and selecting one
-	updated, _ := m.Update(commandsMsg{commands: []string{"ls -la", "find ."}})
+	// Press Enter to submit the pre-filled query (sets originalQuery)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
+
+	// Simulate receiving commands and selecting one
+	updated, _ = model.Update(commandsMsg{commands: []string{"ls -la", "find ."}})
+	model = updated.(Model)
 	model.cursor = 0
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
@@ -1043,8 +1063,13 @@ func TestResultCancelledFromLoading(t *testing.T) {
 		Theme:        DefaultTheme(),
 	})
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	// Press Enter to submit query (sets originalQuery, transitions to stateLoading)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
+
+	// Cancel during loading
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
 
 	result := model.Result()
 	cancelled, ok := result.(CancelledResult)
@@ -1062,8 +1087,13 @@ func TestResultAutoSelectSetsQuery(t *testing.T) {
 		Theme:        DefaultTheme(),
 	})
 
-	updated, _ := m.Update(commandsMsg{commands: []string{"find . -name '*.go'"}})
+	// Press Enter to submit query (sets originalQuery)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
+
+	// Simulate single command result (auto-select)
+	updated, _ = model.Update(commandsMsg{commands: []string{"find . -name '*.go'"}})
+	model = updated.(Model)
 
 	result := model.Result()
 	selected, ok := result.(SelectedResult)

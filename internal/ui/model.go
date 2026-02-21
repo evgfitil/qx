@@ -92,15 +92,13 @@ func newModel(opts RunOptions) Model {
 	s.Spinner = spinner.Dot
 	s.Style = opts.Theme.MutedStyle()
 
-	initialState := stateInput
 	if opts.InitialQuery != "" {
 		ta.SetValue(opts.InitialQuery)
 		ta.CursorEnd()
-		initialState = stateLoading
 	}
 
 	return Model{
-		state:         initialState,
+		state:         stateInput,
 		theme:         opts.Theme,
 		textArea:      ta,
 		spinner:       s,
@@ -108,7 +106,6 @@ func newModel(opts RunOptions) Model {
 		forceSend:     opts.ForceSend,
 		pipeContext:   opts.PipeContext,
 		maxHeight:     minHeight,
-		originalQuery: opts.InitialQuery,
 		selectedIndex: -1,
 	}
 }
