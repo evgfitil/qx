@@ -162,17 +162,17 @@ All fields optional with fzf-like defaults.
 
 ### Task 4: Core model with state machine (`internal/ui/model.go`)
 
-- [ ] define state enum: `stateInput`, `stateLoading`, `stateSelect`, `stateDone`
-- [ ] define `Model` struct with fields: state, theme, textarea, spinner, commands, filtered, cursor, selected, err, opts, width, height, maxHeight, originalQuery
-- [ ] implement `newModel(opts RunOptions)` constructor
-- [ ] implement `newSelectorModel(items []string, display func(int) string, theme Theme)` constructor (starts in stateSelect)
-- [ ] implement `Init()` returning textarea.Blink
-- [ ] implement `Update()` skeleton: handle WindowSizeMsg, KeyMsg dispatch per state, commandsMsg, spinner.TickMsg
-- [ ] implement height management: `maxHeight = max(height * 40 / 100, minHeight)`
-- [ ] write tests for newModel initial state (stateInput when no query, stateLoading when query provided)
-- [ ] write tests for WindowSizeMsg handling (maxHeight calculation)
-- [ ] write tests for Esc/Ctrl+C → stateDone with empty selected (cancelled)
-- [ ] run tests — must pass before next task
+- [x] define state enum: `stateInput`, `stateLoading`, `stateSelect`, `stateDone`
+- [x] define `Model` struct with fields: state, theme, textarea, spinner, commands, filtered, cursor, selected, err, opts, width, height, maxHeight, originalQuery
+- [x] implement `newModel(opts RunOptions)` constructor
+- [x] implement `newSelectorModel(items []string, display func(int) string, theme Theme)` constructor (starts in stateSelect)
+- [x] implement `Init()` returning textarea.Blink
+- [x] implement `Update()` skeleton: handle WindowSizeMsg, KeyMsg dispatch per state, commandsMsg, spinner.TickMsg
+- [x] implement height management: `maxHeight = max(height * 40 / 100, minHeight)`
+- [x] write tests for newModel initial state (stateInput when no query, stateLoading when query provided)
+- [x] write tests for WindowSizeMsg handling (maxHeight calculation)
+- [x] write tests for Esc/Ctrl+C → stateDone with empty selected (cancelled)
+- [x] run tests — must pass before next task
 
 ### Task 5: Input state (`internal/ui/model.go` Update, `internal/ui/view.go`)
 
