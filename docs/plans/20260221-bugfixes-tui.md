@@ -201,22 +201,22 @@ rootCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "refine the last
 
 ### Verify acceptance criteria (all bugs)
 
-- [ ] verify: Bug 1 — `newModel()` с `InitialQuery` → `stateInput` с предзаполненным текстом
-- [ ] verify: Bug 1 — `newModel()` без `InitialQuery` → `stateInput` с пустым полем (без регрессии)
-- [ ] verify: Bug 1 — Enter на предзаполненном тексте → `stateLoading` → генерация
-- [ ] verify: Bug 2 — `qx --last` с `action_menu: false` просто выводит команду
-- [ ] verify: Bug 2 — `qx --last` с `action_menu: true` показывает меню
-- [ ] verify: Bug 3 — textarea начинается с 1 строки (1 `>`)
-- [ ] verify: Bug 3 — при длинном тексте textarea расширяется до 2-3 строк
-- [ ] verify: Bug 3 — при удалении текста textarea сжимается обратно
-- [ ] verify: Refactor 1 — `--last --history` → ошибка от cobra
-- [ ] verify: Refactor 1 — `--last` отдельно работает
-- [ ] verify: Refactor 1 — блок `flagCount` удалён из `run()`
-- [ ] verify: Refactor 2 — `qx -l` работает как `qx --last`
-- [ ] verify: Refactor 2 — `qx -c "query"` работает как `qx --continue "query"`
-- [ ] run full test suite (`go test ./...`)
-- [ ] run linter (`golangci-lint run`)
-- [ ] build binary (`go build -o qx .`)
+- [x] verify: Bug 1 — `newModel()` с `InitialQuery` → `stateInput` с предзаполненным текстом
+- [x] verify: Bug 1 — `newModel()` без `InitialQuery` → `stateInput` с пустым полем (без регрессии)
+- [x] verify: Bug 1 — Enter на предзаполненном тексте → `stateLoading` → генерация
+- [x] verify: Bug 2 — `qx --last` с `action_menu: false` просто выводит команду
+- [x] verify: Bug 2 — `qx --last` с `action_menu: true` показывает меню
+- [x] verify: Bug 3 — textarea начинается с 1 строки (1 `>`)
+- [x] verify: Bug 3 — при длинном тексте textarea расширяется до 2-3 строк
+- [x] verify: Bug 3 — при удалении текста textarea сжимается обратно
+- [x] verify: Refactor 1 — `--last --history` → ошибка от cobra
+- [x] verify: Refactor 1 — `--last` отдельно работает
+- [x] verify: Refactor 1 — блок `flagCount` удалён из `run()`
+- [x] verify: Refactor 2 — `qx -l` работает как `qx --last`
+- [x] verify: Refactor 2 — `qx -c "query"` работает как `qx --continue "query"`
+- [x] run full test suite (`go test ./...`)
+- [x] run linter (`golangci-lint run`)
+- [x] build binary (`go build -o qx .`)
 
 ## Technical Details
 
