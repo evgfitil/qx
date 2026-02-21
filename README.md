@@ -55,6 +55,30 @@ llm:
 **API Key**: Set via `OPENAI_API_KEY` environment variable or `llm.apikey` in config.
 Environment variable takes precedence if both are set.
 
+### Theme
+
+Customize the TUI appearance with an optional `theme` section (all fields have fzf-like defaults):
+
+```yaml
+theme:
+  prompt: "> "           # input prompt prefix
+  pointer: "▌"           # cursor indicator for selected item
+  selected_fg: "170"     # ANSI color or hex (#ff87d7)
+  match_fg: "205"        # highlight color for filter matches
+  text_fg: "252"         # normal text color
+  muted_fg: "241"        # counter and spinner text
+  border: "rounded"      # rounded | normal | thick | hidden
+  border_fg: "240"       # border color
+```
+
+### Action menu
+
+Control whether the post-selection action menu appears in shell integration mode:
+
+```yaml
+action_menu: false  # default: false
+```
+
 ```bash
 # Option 1: environment variable
 export OPENAI_API_KEY="your-key-here"

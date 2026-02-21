@@ -251,8 +251,8 @@ All fields optional with fzf-like defaults.
 
 ### Task 12: [Final] Update documentation
 
-- [ ] update CLAUDE.md architecture section if package names changed
-- [ ] update README.md if config format changed (new theme section)
+- [x] update CLAUDE.md architecture section if package names changed
+- [x] update README.md if config format changed (new theme section)
 
 ## Technical Details
 
