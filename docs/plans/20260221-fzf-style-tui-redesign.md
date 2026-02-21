@@ -235,11 +235,11 @@ All fields optional with fzf-like defaults.
 
 ### Task 10: Remove old packages and dependencies
 
-- [ ] delete `internal/tui/` directory entirely
-- [ ] delete `internal/picker/` directory entirely
-- [ ] run `go mod tidy` to remove `go-fuzzyfinder` and its transitive deps (`tcell`, `termbox-go`, etc.)
-- [ ] verify no remaining imports of `internal/tui` or `internal/picker`
-- [ ] run tests — must pass before next task
+- [x] delete `internal/tui/` directory entirely
+- [x] delete `internal/picker/` directory entirely
+- [x] run `go mod tidy` to remove `go-fuzzyfinder` and its transitive deps (`tcell`, `termbox-go`, etc.)
+- [x] verify no remaining imports of `internal/tui` or `internal/picker`
+- [x] run tests — must pass before next task
 
 ### Task 11: Verify acceptance criteria
 
