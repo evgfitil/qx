@@ -87,11 +87,11 @@ Theme colors (selected item highlighting, pointer color, muted text, border colo
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] verify all style getters use the renderer when provided
-- [ ] verify fallback works when renderer is nil (backward compat, tests without TTY)
-- [ ] run full test suite (`go test ./...`)
-- [ ] run linter (`golangci-lint run`) — all issues must be fixed
-- [ ] build binary (`go build -o qx .`)
+- [x] verify all style getters use the renderer when provided
+- [x] verify fallback works when renderer is nil (backward compat, tests without TTY)
+- [x] run full test suite (`go test ./...`)
+- [x] run linter (`golangci-lint run`) — all issues must be fixed
+- [x] build binary (`go build -o qx .`)
 
 ## Technical Details
 

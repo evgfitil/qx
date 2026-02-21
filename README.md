@@ -73,7 +73,9 @@ theme:
 
 ### Action menu
 
-Control whether the post-selection action menu appears in shell integration mode:
+Control whether the post-selection action menu appears after command selection.
+When disabled (default), the selected command is printed to stdout.
+The `--last` and `--history` subcommands always show the action menu:
 
 ```yaml
 action_menu: false  # default: false

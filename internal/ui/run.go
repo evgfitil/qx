@@ -19,17 +19,25 @@ type RunOptions struct {
 	Theme        Theme
 }
 
+// openTTY opens /dev/tty for writing and creates a lipgloss renderer from it.
+// Falls back to os.Stdout with default renderer if /dev/tty is unavailable.
+// The caller must close the returned file when tty != os.Stdout.
+func openTTY(theme Theme) (*os.File, Theme) {
+	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+	if err != nil {
+		return os.Stdout, theme.WithRenderer(lipgloss.DefaultRenderer())
+	}
+	return tty, theme.WithRenderer(lipgloss.NewRenderer(tty))
+}
+
 // Run starts the full TUI flow (input -> loading -> selecting -> done)
 // and returns the result of user interaction.
 func Run(opts RunOptions) (Result, error) {
-	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
-	if err != nil {
-		tty = os.Stdout
-		opts.Theme = opts.Theme.WithRenderer(lipgloss.DefaultRenderer())
-	} else {
+	tty, theme := openTTY(opts.Theme)
+	if tty != os.Stdout {
 		defer tty.Close() //nolint:errcheck
-		opts.Theme = opts.Theme.WithRenderer(lipgloss.NewRenderer(tty))
 	}
+	opts.Theme = theme
 
 	m := newModel(opts)
 	p := tea.NewProgram(m, tea.WithOutput(tty), tea.WithInputTTY())
@@ -39,23 +47,19 @@ func Run(opts RunOptions) (Result, error) {
 		return nil, fmt.Errorf("TUI error: %w", err)
 	}
 
-	if model, ok := result.(Model); ok {
-		return model.Result(), nil
+	model, ok := result.(Model)
+	if !ok {
+		return nil, fmt.Errorf("unexpected model type: %T", result)
 	}
-
-	return CancelledResult{Query: opts.InitialQuery}, nil
+	return model.Result(), nil
 }
 
 // RunSelector starts a selector-only TUI for picking from a list of items.
 // Returns the selected index or -1 if cancelled.
 func RunSelector(items []string, display func(int) string, theme Theme) (int, error) {
-	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
-	if err != nil {
-		tty = os.Stdout
-		theme = theme.WithRenderer(lipgloss.DefaultRenderer())
-	} else {
+	tty, theme := openTTY(theme)
+	if tty != os.Stdout {
 		defer tty.Close() //nolint:errcheck
-		theme = theme.WithRenderer(lipgloss.NewRenderer(tty))
 	}
 
 	m := newSelectorModel(items, display, theme)
@@ -66,9 +70,9 @@ func RunSelector(items []string, display func(int) string, theme Theme) (int, er
 		return -1, fmt.Errorf("selector error: %w", err)
 	}
 
-	if model, ok := result.(Model); ok {
-		return model.selectedIndex, nil
+	model, ok := result.(Model)
+	if !ok {
+		return -1, fmt.Errorf("unexpected model type: %T", result)
 	}
-
-	return -1, nil
+	return model.selectedIndex, nil
 }

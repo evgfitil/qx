@@ -741,6 +741,7 @@ func TestRunInteractive_ConfigError_PrintsToStderr(t *testing.T) {
 func TestRunInteractive_WithMockedUI_SelectedResult(t *testing.T) {
 	withMockFns(t)
 	withTempHistoryStore(t)
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("OPENAI_API_KEY", "test-key")
 
 	uiRunFn = func(opts ui.RunOptions) (ui.Result, error) {
@@ -768,6 +769,7 @@ func TestRunInteractive_WithMockedUI_SelectedResult(t *testing.T) {
 
 func TestRunInteractive_WithMockedUI_CancelledResult(t *testing.T) {
 	withMockFns(t)
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("OPENAI_API_KEY", "test-key")
 
 	uiRunFn = func(opts ui.RunOptions) (ui.Result, error) {
