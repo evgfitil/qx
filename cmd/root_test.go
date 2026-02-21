@@ -400,7 +400,10 @@ func TestRun_ContinueWithoutQueryArg(t *testing.T) {
 	}
 }
 
-func TestRun_MutuallyExclusiveFlags(t *testing.T) {
+// resetCmdFlags resets flag state after cobra.Execute() to avoid polluting
+// other tests. Cobra marks flags as Changed when parsed via SetArgs/Execute.
+func resetCmdFlags(t *testing.T) {
+	t.Helper()
 	origLast := lastFlag
 	origHistory := historyFlag
 	origContinue := continueFlag
@@ -408,19 +411,70 @@ func TestRun_MutuallyExclusiveFlags(t *testing.T) {
 		lastFlag = origLast
 		historyFlag = origHistory
 		continueFlag = origContinue
+		for _, name := range []string{"last", "history", "continue"} {
+			if f := rootCmd.Flags().Lookup(name); f != nil {
+				f.Changed = false
+			}
+		}
+		rootCmd.SetArgs(nil)
 	})
+}
 
-	lastFlag = true
-	historyFlag = true
-	continueFlag = false
-
-	err := run(rootCmd, []string{})
-	if err == nil {
-		t.Fatal("expected error for combined --last and --history")
+func TestShortFlags_Registered(t *testing.T) {
+	tests := []struct {
+		long  string
+		short string
+	}{
+		{"last", "l"},
+		{"continue", "c"},
 	}
-	want := "--last, --history, and --continue are mutually exclusive"
-	if got := err.Error(); got != want {
-		t.Errorf("error = %q, want %q", got, want)
+	for _, tt := range tests {
+		f := rootCmd.Flags().Lookup(tt.long)
+		if f == nil {
+			t.Errorf("flag %q not found", tt.long)
+			continue
+		}
+		if f.Shorthand != tt.short {
+			t.Errorf("flag %q shorthand = %q, want %q", tt.long, f.Shorthand, tt.short)
+		}
+	}
+}
+
+func TestShortFlags_HistoryHasNoShorthand(t *testing.T) {
+	f := rootCmd.Flags().Lookup("history")
+	if f == nil {
+		t.Fatal("flag \"history\" not found")
+	}
+	if f.Shorthand != "" {
+		t.Errorf("history flag should have no shorthand, got %q", f.Shorthand)
+	}
+}
+
+func TestRun_MutuallyExclusiveFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"last_and_history", []string{"--last", "--history"}},
+		{"short_last_and_history", []string{"-l", "--history"}},
+		{"last_and_continue", []string{"--last", "--continue", "query"}},
+		{"short_last_and_short_continue", []string{"-l", "-c", "query"}},
+		{"history_and_continue", []string{"--history", "--continue", "query"}},
+		{"all_three", []string{"--last", "--history", "--continue", "query"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetCmdFlags(t)
+
+			rootCmd.SetArgs(tt.args)
+			err := rootCmd.Execute()
+			if err == nil {
+				t.Fatal("expected error for mutually exclusive flags")
+			}
+			if !strings.Contains(err.Error(), "none of the others can be") {
+				t.Errorf("expected mutual exclusivity error, got: %q", err.Error())
+			}
+		})
 	}
 }
 
@@ -457,14 +511,18 @@ func TestRunContinue_WithHistory(t *testing.T) {
 func withMockFns(t *testing.T) {
 	t.Helper()
 	origShouldPrompt := shouldPromptFn
+	origShouldPromptStderr := shouldPromptStderrFn
 	origPromptAction := promptActionFn
 	origReadRefinement := readRefinementFn
 	origGenerateCommands := generateCommandsFn
+	origActionMenuEnabled := actionMenuEnabled
 	t.Cleanup(func() {
 		shouldPromptFn = origShouldPrompt
+		shouldPromptStderrFn = origShouldPromptStderr
 		promptActionFn = origPromptAction
 		readRefinementFn = origReadRefinement
 		generateCommandsFn = origGenerateCommands
+		actionMenuEnabled = origActionMenuEnabled
 	})
 }
 
@@ -674,5 +732,142 @@ func TestHandleSelectedCommand_TTY_ActionErrorSavesHistory(t *testing.T) {
 	}
 	if entries[0].Selected != "bad-cmd" {
 		t.Errorf("Selected = %q, want %q", entries[0].Selected, "bad-cmd")
+	}
+}
+
+func TestHandleSelectedCommand_ActionMenuEnabled_StdoutPipe_StderrTTY(t *testing.T) {
+	// When action_menu is enabled, stdout is a pipe, and stderr is a TTY,
+	// the action menu should be shown (shell integration mode).
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	actionMenuEnabled = true
+	shouldPromptFn = func() bool { return false }      // stdout is pipe
+	shouldPromptStderrFn = func() bool { return true } // stderr is TTY
+
+	var menuShown bool
+	promptActionFn = func(cmd string) error {
+		menuShown = true
+		fmt.Println(cmd) // simulate quit action
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	_ = w.Close()
+	_, _ = io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !menuShown {
+		t.Error("expected action menu to be shown when action_menu enabled and stderr is TTY")
+	}
+	entries, _ := store.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(entries))
+	}
+	if entries[0].Selected != "echo hello" {
+		t.Errorf("Selected = %q, want %q", entries[0].Selected, "echo hello")
+	}
+}
+
+func TestHandleSelectedCommand_ActionMenuEnabled_StdoutPipe_StderrPipe(t *testing.T) {
+	// When action_menu is enabled but both stdout and stderr are pipes,
+	// the command should be printed to stdout without the menu.
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	actionMenuEnabled = true
+	shouldPromptFn = func() bool { return false }       // stdout is pipe
+	shouldPromptStderrFn = func() bool { return false } // stderr is also pipe
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	_ = w.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if string(out) != "echo hello\n" {
+		t.Errorf("output = %q, want %q", string(out), "echo hello\n")
+	}
+	entries, _ := store.List()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 history entry, got %d", len(entries))
+	}
+}
+
+func TestHandleSelectedCommand_ActionMenuDisabled_DefaultBehavior(t *testing.T) {
+	// When action_menu is disabled (default), non-TTY stdout should print
+	// command directly, regardless of stderr state.
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	actionMenuEnabled = false
+	shouldPromptFn = func() bool { return false }      // stdout is pipe
+	shouldPromptStderrFn = func() bool { return true } // stderr is TTY (shouldn't matter)
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	_ = w.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if string(out) != "echo hello\n" {
+		t.Errorf("output = %q, want %q", string(out), "echo hello\n")
+	}
+}
+
+func TestHandleSelectedCommand_StdoutTTY_ShowsMenuRegardlessOfConfig(t *testing.T) {
+	// When stdout IS a TTY, action menu shows regardless of actionMenuEnabled.
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	actionMenuEnabled = false
+	shouldPromptFn = func() bool { return true } // stdout is TTY
+
+	var menuShown bool
+	promptActionFn = func(cmd string) error {
+		menuShown = true
+		fmt.Println(cmd)
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test", "")
+	_ = w.Close()
+	_, _ = io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !menuShown {
+		t.Error("expected action menu to be shown when stdout is TTY")
 	}
 }

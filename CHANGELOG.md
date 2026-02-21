@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Persistent command history storage (`~/.config/qx/history.json`, last 100 entries)
+- `--last` (`-l`) flag to show last selected command and open action menu
+- `--history` flag to browse past queries with interactive fzf picker
+- `--continue` (`-c`) flag to refine the last command with follow-up context
+- `[r]evise` post-selection action for iterative command refinement
+- `action_menu` config option to enable action menu in shell integration mode
+
+### Changed
+
+- Flag mutual exclusivity (`--last`, `--history`, `--continue`) enforced by cobra instead of manual check
+
 ## [0.7.3] - 2026-02-17
 
 ### Fixed

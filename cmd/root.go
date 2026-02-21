@@ -23,14 +23,15 @@ import (
 const ExitCodeCancelled = 130
 
 var (
-	Version          = "dev"
-	shellIntegration string
-	showConfig       bool
-	queryFlag        string
-	forceSend        bool
-	lastFlag         bool
-	historyFlag      bool
-	continueFlag     bool
+	Version           = "dev"
+	shellIntegration  string
+	showConfig        bool
+	queryFlag         string
+	forceSend         bool
+	lastFlag          bool
+	historyFlag       bool
+	continueFlag      bool
+	actionMenuEnabled bool
 )
 
 // ErrCancelled indicates user cancelled the operation.
@@ -38,10 +39,11 @@ var ErrCancelled = errors.New("operation cancelled")
 
 // Overridable function references for testing.
 var (
-	shouldPromptFn     = action.ShouldPrompt
-	promptActionFn     = action.PromptAction
-	readRefinementFn   = action.ReadRefinement
-	generateCommandsFn func(query string, pipeContext string, followUp *llm.FollowUpContext) error
+	shouldPromptFn       = action.ShouldPrompt
+	shouldPromptStderrFn = action.ShouldPromptStderr
+	promptActionFn       = action.PromptAction
+	readRefinementFn     = action.ReadRefinement
+	generateCommandsFn   func(query string, pipeContext string, followUp *llm.FollowUpContext) error
 )
 
 var rootCmd = &cobra.Command{
@@ -69,9 +71,11 @@ func init() {
 	rootCmd.Flags().BoolVar(&showConfig, "config", false, "show config file path")
 	rootCmd.Flags().StringVarP(&queryFlag, "query", "q", "", "initial query for TUI input (pre-fills the input field)")
 	rootCmd.Flags().BoolVar(&forceSend, "force-send", false, "send query even if secrets detected")
-	rootCmd.Flags().BoolVar(&lastFlag, "last", false, "show last selected command and open action menu")
+	rootCmd.Flags().BoolVarP(&lastFlag, "last", "l", false, "show last selected command and open action menu")
 	rootCmd.Flags().BoolVar(&historyFlag, "history", false, "browse command history with interactive picker")
-	rootCmd.Flags().BoolVar(&continueFlag, "continue", false, "refine the last command with a new query")
+	rootCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "refine the last command with a new query")
+
+	rootCmd.MarkFlagsMutuallyExclusive("last", "history", "continue")
 }
 
 // Execute runs the root command
@@ -89,19 +93,8 @@ func run(cmd *cobra.Command, args []string) error {
 		return handleShellIntegration(shellIntegration)
 	}
 
-	flagCount := 0
-	if lastFlag {
-		flagCount++
-	}
-	if historyFlag {
-		flagCount++
-	}
-	if continueFlag {
-		flagCount++
-	}
-	if flagCount > 1 {
-		return fmt.Errorf("--last, --history, and --continue are mutually exclusive")
-	}
+	prefs := config.LoadPreferences()
+	actionMenuEnabled = prefs.ActionMenu
 
 	if lastFlag {
 		return runLast()
@@ -326,13 +319,20 @@ func saveToHistory(entry history.Entry) {
 	_ = store.Add(entry)
 }
 
-// handleSelectedCommand either shows the post-selection action menu (when
-// stdout is a TTY) or prints the command to stdout (when redirected).
+// handleSelectedCommand shows the post-selection action menu when stdout is
+// a TTY. When action_menu config is enabled, the menu also shows if stderr
+// is a TTY (shell integration mode where stdout is captured). Otherwise
+// prints the command to stdout directly.
 // When the user chooses "revise", it reads a refinement query and starts
 // a new generation cycle with follow-up context. History is saved only
 // on the final action (execute/copy/quit), not on intermediate revisions.
 func handleSelectedCommand(command, query, pipeContext string) error {
-	if !shouldPromptFn() {
+	showMenu := shouldPromptFn()
+	if !showMenu && actionMenuEnabled {
+		showMenu = shouldPromptStderrFn()
+	}
+
+	if !showMenu {
 		saveToHistory(history.Entry{
 			Query:       query,
 			Selected:    command,

@@ -38,6 +38,13 @@ func ShouldPrompt() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 }
 
+// ShouldPromptStderr returns true if stderr is a TTY. This is used in shell
+// integration mode where stdout is captured by $() but stderr is redirected
+// to /dev/tty, allowing the action menu to render on stderr.
+func ShouldPromptStderr() bool {
+	return isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
+}
+
 // readKeypress reads a single keypress from the given reader, which should
 // be in raw mode. Handles multi-byte escape sequences by draining trailing
 // bytes so they don't leak into the parent shell.
