@@ -212,13 +212,13 @@ All fields optional with fzf-like defaults.
 
 ### Task 8: Done state and cleanup (`internal/ui/view.go`, `internal/ui/run.go`)
 
-- [ ] implement stateDone View: return `""` (empty string triggers bubbletea cleanup)
-- [ ] implement `Model.Result()` method extracting SelectedResult or CancelledResult
-- [ ] complete `Run()`: after `tea.Program.Run()`, extract result from model
-- [ ] complete `RunSelector()`: after `tea.Program.Run()`, extract selected index
-- [ ] write tests for done state View returning empty string
-- [ ] write tests for Result() extraction for selected and cancelled cases
-- [ ] run tests — must pass before next task
+- [x] implement stateDone View: return `""` (empty string triggers bubbletea cleanup)
+- [x] implement `Model.Result()` method extracting SelectedResult or CancelledResult
+- [x] complete `Run()`: after `tea.Program.Run()`, extract result from model
+- [x] complete `RunSelector()`: after `tea.Program.Run()`, extract selected index
+- [x] write tests for done state View returning empty string
+- [x] write tests for Result() extraction for selected and cancelled cases
+- [x] run tests — must pass before next task
 
 ### Task 9: Integrate into cmd/root.go
 
