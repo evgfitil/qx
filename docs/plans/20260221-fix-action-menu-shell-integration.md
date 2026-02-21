@@ -57,13 +57,13 @@ result=$("$qx_cmd" --query "$READLINE_LINE" </dev/tty 2>/dev/tty)
 
 ### Task 2: Wire stderr check in `handleSelectedCommand()` (`cmd/root.go`)
 
-- [ ] добавить `shouldPromptStderrFn = action.ShouldPromptStderr` в overridable vars (строка 40)
-- [ ] в `handleSelectedCommand()` (строка 350): заменить `if !actionMenu || !shouldPromptFn()` на двухступенчатую проверку — если stdout не TTY, но actionMenu и stderr TTY → показать меню
-- [ ] write tests: actionMenu=true, stdout=pipe, stderr=TTY → меню показывается
-- [ ] write tests: actionMenu=false, stdout=pipe, stderr=TTY → меню НЕ показывается
-- [ ] write tests: actionMenu=true, stdout=TTY → меню показывается (без регрессии)
-- [ ] update existing tests that mock `shouldPromptFn`
-- [ ] run tests (`go test ./...`) — must pass
+- [x] добавить `shouldPromptStderrFn = action.ShouldPromptStderr` в overridable vars (строка 40)
+- [x] в `handleSelectedCommand()` (строка 350): заменить `if !actionMenu || !shouldPromptFn()` на двухступенчатую проверку — если stdout не TTY, но actionMenu и stderr TTY → показать меню
+- [x] write tests: actionMenu=true, stdout=pipe, stderr=TTY → меню показывается
+- [x] write tests: actionMenu=false, stdout=pipe, stderr=TTY → меню НЕ показывается
+- [x] write tests: actionMenu=true, stdout=TTY → меню показывается (без регрессии)
+- [x] update existing tests that mock `shouldPromptFn`
+- [x] run tests (`go test ./...`) — must pass
 
 ### Task 3: Verify acceptance criteria
 

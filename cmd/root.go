@@ -37,12 +37,13 @@ var ErrCancelled = errors.New("operation cancelled")
 
 // Overridable function references for testing.
 var (
-	shouldPromptFn     = action.ShouldPrompt
-	promptActionFn     = action.PromptAction
-	readRefinementFn   = action.ReadRefinement
-	generateCommandsFn func(query string, pipeContext string, followUp *llm.FollowUpContext) error
-	uiRunFn            = ui.Run
-	uiRunSelectorFn    = ui.RunSelector
+	shouldPromptFn       = action.ShouldPrompt
+	shouldPromptStderrFn = action.ShouldPromptStderr
+	promptActionFn       = action.PromptAction
+	readRefinementFn     = action.ReadRefinement
+	generateCommandsFn   func(query string, pipeContext string, followUp *llm.FollowUpContext) error
+	uiRunFn              = ui.Run
+	uiRunSelectorFn      = ui.RunSelector
 )
 
 var rootCmd = &cobra.Command{
@@ -347,7 +348,11 @@ func saveToHistory(entry history.Entry) {
 // follow-up context. History is saved only on the final action
 // (execute/copy/quit), not on intermediate revisions.
 func handleSelectedCommand(command, query, pipeContext string, actionMenu bool) error {
-	if !actionMenu || !shouldPromptFn() {
+	showMenu := shouldPromptFn()
+	if !showMenu && actionMenu {
+		showMenu = shouldPromptStderrFn()
+	}
+	if !actionMenu || !showMenu {
 		saveToHistory(history.Entry{
 			Query:       query,
 			Selected:    command,
