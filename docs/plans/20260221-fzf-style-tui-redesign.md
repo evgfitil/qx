@@ -222,16 +222,16 @@ All fields optional with fzf-like defaults.
 
 ### Task 9: Integrate into cmd/root.go
 
-- [ ] replace `tui.Run()` call in `runInteractive()` with `ui.Run()`
-- [ ] replace `picker.Pick()` call in `generateCommands()` with `ui.RunSelector()` (wrap commands as items)
-- [ ] replace `picker.PickIndex()` call in `runHistory()` with `ui.RunSelector()`
-- [ ] wire action\_menu config: if `cfg.ActionMenu` true and stdout is TTY, call `action.PromptAction()`; otherwise print to stdout
-- [ ] update imports: remove `internal/tui`, remove `internal/picker`, add `internal/ui`
-- [ ] update `tui.ShowError()` references — move error display into `ui.Run()` or handle in cmd
-- [ ] write tests for runInteractive with new ui.Run integration
-- [ ] write tests for generateCommands with new ui.RunSelector integration
-- [ ] update existing cmd/root\_test.go for changed flow
-- [ ] run tests — must pass before next task
+- [x] replace `tui.Run()` call in `runInteractive()` with `ui.Run()`
+- [x] replace `picker.Pick()` call in `generateCommands()` with `ui.RunSelector()` (wrap commands as items)
+- [x] replace `picker.PickIndex()` call in `runHistory()` with `ui.RunSelector()`
+- [x] wire action\_menu config: if `cfg.ActionMenu` true and stdout is TTY, call `action.PromptAction()`; otherwise print to stdout
+- [x] update imports: remove `internal/tui`, remove `internal/picker`, add `internal/ui`
+- [x] update `tui.ShowError()` references — move error display into `ui.Run()` or handle in cmd
+- [x] write tests for runInteractive with new ui.Run integration
+- [x] write tests for generateCommands with new ui.RunSelector integration
+- [x] update existing cmd/root\_test.go for changed flow
+- [x] run tests — must pass before next task
 
 ### Task 10: Remove old packages and dependencies
 

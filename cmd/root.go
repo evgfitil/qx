@@ -15,9 +15,8 @@ import (
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/history"
 	"github.com/evgfitil/qx/internal/llm"
-	"github.com/evgfitil/qx/internal/picker"
 	"github.com/evgfitil/qx/internal/shell"
-	"github.com/evgfitil/qx/internal/tui"
+	"github.com/evgfitil/qx/internal/ui"
 )
 
 const ExitCodeCancelled = 130
@@ -42,6 +41,8 @@ var (
 	promptActionFn     = action.PromptAction
 	readRefinementFn   = action.ReadRefinement
 	generateCommandsFn func(query string, pipeContext string, followUp *llm.FollowUpContext) error
+	uiRunFn            = ui.Run
+	uiRunSelectorFn    = ui.RunSelector
 )
 
 var rootCmd = &cobra.Command{
@@ -142,29 +143,33 @@ func runInteractive(initialQuery string, pipeContext string) error {
 
 	cfg, err := config.Load()
 	if err != nil {
-		if _, showErr := tui.ShowError(err, initialQuery); showErr != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		if initialQuery != "" {
 			fmt.Println(initialQuery)
 		}
 		return ErrCancelled
 	}
 
-	result, err := tui.Run(cfg.LLM.ToLLMConfig(), initialQuery, forceSend, pipeContext)
+	result, err := uiRunFn(ui.RunOptions{
+		InitialQuery: initialQuery,
+		LLMConfig:    cfg.LLM.ToLLMConfig(),
+		ForceSend:    forceSend,
+		PipeContext:  pipeContext,
+		Theme:        cfg.Theme.ToTheme(),
+	})
 	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
 
 	switch r := result.(type) {
-	case tui.CancelledResult:
+	case ui.CancelledResult:
 		if r.Query != "" {
 			fmt.Println(r.Query)
 		}
 		return ErrCancelled
-	case tui.SelectedResult:
+	case ui.SelectedResult:
 		if r.Command != "" {
-			return handleSelectedCommand(r.Command, r.Query, pipeContext)
+			return handleSelectedCommand(r.Command, r.Query, pipeContext, cfg.ActionMenu)
 		}
 		return nil
 	default:
@@ -196,7 +201,7 @@ func runLast() error {
 		return fmt.Errorf("failed to read history: %w", err)
 	}
 
-	return handleSelectedCommand(entry.Selected, entry.Query, entry.PipeContext)
+	return handleSelectedCommand(entry.Selected, entry.Query, entry.PipeContext, true)
 }
 
 // runHistory loads all history entries and presents an interactive picker.
@@ -215,17 +220,24 @@ func runHistory() error {
 		return fmt.Errorf("no history yet — run a query first")
 	}
 
-	idx, err := picker.PickIndex(len(entries), func(i int) string {
-		return formatHistoryEntry(entries[i])
-	})
+	items := make([]string, len(entries))
+	for i := range entries {
+		items[i] = formatHistoryEntry(entries[i])
+	}
+
+	theme := ui.DefaultTheme()
+	idx, err := uiRunSelectorFn(items, func(i int) string {
+		return items[i]
+	}, theme)
 	if err != nil {
-		if errors.Is(err, picker.ErrAborted) {
-			return ErrCancelled
-		}
 		return fmt.Errorf("failed to pick from history: %w", err)
 	}
 
-	return handleSelectedCommand(entries[idx].Selected, entries[idx].Query, entries[idx].PipeContext)
+	if idx < 0 {
+		return ErrCancelled
+	}
+
+	return handleSelectedCommand(entries[idx].Selected, entries[idx].Query, entries[idx].PipeContext, true)
 }
 
 // runContinue loads the last history entry and uses it as follow-up context
@@ -290,20 +302,23 @@ func generateCommands(query string, pipeContext string, followUp *llm.FollowUpCo
 		return fmt.Errorf("no commands generated")
 	}
 
-	selected, err := picker.Pick(commands)
+	if len(commands) == 1 {
+		return handleSelectedCommand(commands[0], query, pipeContext, cfg.ActionMenu)
+	}
+
+	idx, err := uiRunSelectorFn(commands, func(i int) string {
+		return commands[i]
+	}, cfg.Theme.ToTheme())
 	if err != nil {
-		if errors.Is(err, picker.ErrAborted) {
-			fmt.Println(query)
-			return ErrCancelled
-		}
 		return fmt.Errorf("failed to pick command: %w", err)
 	}
 
-	if selected != "" {
-		return handleSelectedCommand(selected, query, pipeContext)
+	if idx < 0 {
+		fmt.Println(query)
+		return ErrCancelled
 	}
 
-	return nil
+	return handleSelectedCommand(commands[idx], query, pipeContext, cfg.ActionMenu)
 }
 
 // newHistoryStore creates a history store using the default config directory.
@@ -326,13 +341,14 @@ func saveToHistory(entry history.Entry) {
 	_ = store.Add(entry)
 }
 
-// handleSelectedCommand either shows the post-selection action menu (when
-// stdout is a TTY) or prints the command to stdout (when redirected).
-// When the user chooses "revise", it reads a refinement query and starts
-// a new generation cycle with follow-up context. History is saved only
-// on the final action (execute/copy/quit), not on intermediate revisions.
-func handleSelectedCommand(command, query, pipeContext string) error {
-	if !shouldPromptFn() {
+// handleSelectedCommand either shows the post-selection action menu or
+// prints the command to stdout. The action menu is shown only when
+// actionMenu is true AND stdout is a TTY. When the user chooses "revise",
+// it reads a refinement query and starts a new generation cycle with
+// follow-up context. History is saved only on the final action
+// (execute/copy/quit), not on intermediate revisions.
+func handleSelectedCommand(command, query, pipeContext string, actionMenu bool) error {
+	if !actionMenu || !shouldPromptFn() {
 		saveToHistory(history.Entry{
 			Query:       query,
 			Selected:    command,
