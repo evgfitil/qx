@@ -33,7 +33,7 @@ func (m Model) View() string {
 		b.WriteString(m.viewSelector())
 
 	case stateDone:
-		// TODO: Task 8
+		return ""
 	}
 
 	return b.String()

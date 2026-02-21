@@ -936,6 +936,153 @@ func TestGetDisplayTextSelectorMode(t *testing.T) {
 	}
 }
 
+// --- Done state and result extraction tests (Task 8) ---
+
+func TestDoneStateViewReturnsEmpty(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateDone
+	m.quitting = true
+
+	view := m.View()
+
+	if view != "" {
+		t.Errorf("View() = %q, want empty string in done state", view)
+	}
+}
+
+func TestDoneStateViewAfterSelection(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	view := model.View()
+
+	if view != "" {
+		t.Errorf("View() = %q, want empty string after selection", view)
+	}
+}
+
+func TestDoneStateViewAfterCancel(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	view := model.View()
+
+	if view != "" {
+		t.Errorf("View() = %q, want empty string after cancel", view)
+	}
+}
+
+func TestResultSelectedFromInput(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "list files",
+		Theme:        DefaultTheme(),
+	})
+
+	// Simulate receiving commands and selecting one
+	updated, _ := m.Update(commandsMsg{commands: []string{"ls -la", "find ."}})
+	model := updated.(Model)
+	model.cursor = 0
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+
+	result := model.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatalf("result type = %T, want SelectedResult", result)
+	}
+	if selected.Command != "ls -la" {
+		t.Errorf("Command = %q, want %q", selected.Command, "ls -la")
+	}
+	if selected.Query != "list files" {
+		t.Errorf("Query = %q, want %q", selected.Query, "list files")
+	}
+}
+
+func TestResultCancelledFromInput(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("test query")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatalf("result type = %T, want CancelledResult", result)
+	}
+	if cancelled.Query != "" {
+		t.Errorf("Query = %q, want empty (originalQuery not set before Enter)", cancelled.Query)
+	}
+}
+
+func TestResultCancelledFromLoading(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "my query",
+		Theme:        DefaultTheme(),
+	})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatalf("result type = %T, want CancelledResult", result)
+	}
+	if cancelled.Query != "my query" {
+		t.Errorf("Query = %q, want %q", cancelled.Query, "my query")
+	}
+}
+
+func TestResultAutoSelectSetsQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "find go files",
+		Theme:        DefaultTheme(),
+	})
+
+	updated, _ := m.Update(commandsMsg{commands: []string{"find . -name '*.go'"}})
+	model := updated.(Model)
+
+	result := model.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatalf("result type = %T, want SelectedResult", result)
+	}
+	if selected.Command != "find . -name '*.go'" {
+		t.Errorf("Command = %q, want %q", selected.Command, "find . -name '*.go'")
+	}
+	if selected.Query != "find go files" {
+		t.Errorf("Query = %q, want %q", selected.Query, "find go files")
+	}
+}
+
+func TestRunSelectorResultIndex(t *testing.T) {
+	items := []string{"item-a", "item-b", "item-c"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
+	m.cursor = 1
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.selectedIndex != 1 {
+		t.Errorf("selectedIndex = %d, want 1", model.selectedIndex)
+	}
+}
+
+func TestRunSelectorCancelledIndex(t *testing.T) {
+	items := []string{"item-a", "item-b"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	if model.selectedIndex != -1 {
+		t.Errorf("selectedIndex = %d, want -1 (cancelled)", model.selectedIndex)
+	}
+}
+
 var errTest = testError("test error")
 
 type testError string
