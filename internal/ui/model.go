@@ -389,5 +389,8 @@ func (m Model) Result() Result {
 	if m.selected != "" {
 		return SelectedResult{Command: m.selected, Query: m.originalQuery}
 	}
-	return CancelledResult{Query: m.originalQuery}
+	if m.originalQuery != "" {
+		return CancelledResult{Query: m.originalQuery}
+	}
+	return CancelledResult{Query: m.textArea.Value()}
 }

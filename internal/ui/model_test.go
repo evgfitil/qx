@@ -1052,8 +1052,27 @@ func TestResultCancelledFromInput(t *testing.T) {
 	if !ok {
 		t.Fatalf("result type = %T, want CancelledResult", result)
 	}
-	if cancelled.Query != "" {
-		t.Errorf("Query = %q, want empty (originalQuery not set before Enter)", cancelled.Query)
+	if cancelled.Query != "test query" {
+		t.Errorf("Query = %q, want %q (should fall back to textarea value)", cancelled.Query, "test query")
+	}
+}
+
+func TestResultCancelledFromInputWithInitialQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "find . -type f",
+		Theme:        DefaultTheme(),
+	})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatalf("result type = %T, want CancelledResult", result)
+	}
+	if cancelled.Query != "find . -type f" {
+		t.Errorf("Query = %q, want %q (should preserve pre-filled query for shell buffer restore)", cancelled.Query, "find . -type f")
 	}
 }
 
