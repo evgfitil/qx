@@ -186,8 +186,14 @@ func handleShellIntegration(shellName string) error {
 	return nil
 }
 
-// runLast loads the most recent history entry and opens the action menu on it.
+// runLast loads the most recent history entry and either prints the command
+// or opens the action menu, depending on the action_menu config setting.
 func runLast() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	store, err := newHistoryStore()
 	if err != nil {
 		return fmt.Errorf("failed to access history: %w", err)
@@ -201,7 +207,7 @@ func runLast() error {
 		return fmt.Errorf("failed to read history: %w", err)
 	}
 
-	return handleSelectedCommand(entry.Selected, entry.Query, entry.PipeContext, true)
+	return handleSelectedCommand(entry.Selected, entry.Query, entry.PipeContext, cfg.ActionMenu)
 }
 
 // runHistory loads all history entries and presents an interactive picker.

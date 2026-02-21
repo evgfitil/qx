@@ -167,11 +167,11 @@ rootCmd.Flags().BoolVarP(&continueFlag, "continue", "c", false, "refine the last
 
 ### Bug 2, Task 1: Fix `runLast()` to respect `action_menu` config (`cmd/root.go`)
 
-- [ ] в `runLast()`: загрузить конфиг через `config.Load()` и передать `cfg.ActionMenu` вместо хардкоженного `true` в вызов `handleSelectedCommand()`
-- [ ] update `root_test.go`: тест что `runLast()` с `action_menu: false` выводит команду в stdout без вызова action menu
-- [ ] update `root_test.go`: тест что `runLast()` с `action_menu: true` показывает action menu (без регрессии)
-- [ ] проверить и обновить существующие тесты `runLast`
-- [ ] run tests (`go test ./...`) — must pass
+- [x] в `runLast()`: загрузить конфиг через `config.Load()` и передать `cfg.ActionMenu` вместо хардкоженного `true` в вызов `handleSelectedCommand()`
+- [x] update `root_test.go`: тест что `runLast()` с `action_menu: false` выводит команду в stdout без вызова action menu
+- [x] update `root_test.go`: тест что `runLast()` с `action_menu: true` показывает action menu (без регрессии)
+- [x] проверить и обновить существующие тесты `runLast`
+- [x] run tests (`go test ./...`) — must pass
 
 ### Bug 3, Task 1: Auto-resize textarea в stateInput (`internal/ui/model.go`)
 

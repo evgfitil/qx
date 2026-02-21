@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -154,6 +155,24 @@ func withTempHistoryStore(t *testing.T) *history.Store {
 	return store
 }
 
+// withTestConfig sets up a test config environment with a config file.
+// actionMenu controls the action_menu setting in the generated config.
+func withTestConfig(t *testing.T, actionMenu bool) {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("OPENAI_API_KEY", "test-key")
+
+	configDir := filepath.Join(dir, ".config", "qx")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+	content := fmt.Sprintf("action_menu: %v\n", actionMenu)
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+}
+
 func TestSaveToHistory_PersistsEntry(t *testing.T) {
 	store := withTempHistoryStore(t)
 
@@ -220,6 +239,7 @@ func TestSaveToHistory_StoreCreationError(t *testing.T) {
 
 func TestRunLast_WithHistory(t *testing.T) {
 	store := withTempHistoryStore(t)
+	withTestConfig(t, false)
 
 	_ = store.Add(history.Entry{
 		Query:     "find large files",
@@ -253,6 +273,7 @@ func TestRunLast_WithHistory(t *testing.T) {
 
 func TestRunLast_EmptyHistory(t *testing.T) {
 	withTempHistoryStore(t)
+	withTestConfig(t, false)
 
 	err := runLast()
 	if err == nil {
@@ -264,6 +285,8 @@ func TestRunLast_EmptyHistory(t *testing.T) {
 }
 
 func TestRunLast_StoreCreationError(t *testing.T) {
+	withTestConfig(t, false)
+
 	orig := newHistoryStore
 	newHistoryStore = func() (*history.Store, error) {
 		return nil, fmt.Errorf("no home directory")
@@ -277,6 +300,73 @@ func TestRunLast_StoreCreationError(t *testing.T) {
 	want := "failed to access history: no home directory"
 	if got := err.Error(); got != want {
 		t.Errorf("error = %q, want %q", got, want)
+	}
+}
+
+func TestRunLast_ActionMenuFalse_PrintsWithoutMenu(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+	withTestConfig(t, false)
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	shouldPromptFn = func() bool { return true }
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := runLast()
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if menuCalled {
+		t.Error("action menu should not be called when action_menu is false in config")
+	}
+	if string(out) != "find . -size +100M\n" {
+		t.Errorf("output = %q, want %q", string(out), "find . -size +100M\n")
+	}
+}
+
+func TestRunLast_ActionMenuTrue_ShowsMenu(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+	withTestConfig(t, true)
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	shouldPromptFn = func() bool { return true }
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	err := runLast()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !menuCalled {
+		t.Error("action menu should be called when action_menu is true in config")
 	}
 }
 
