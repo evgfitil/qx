@@ -1,10 +1,12 @@
 package ui
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestNewModelWithoutQuery(t *testing.T) {
@@ -1162,6 +1164,33 @@ func TestEmptyCommandListEscCancels(t *testing.T) {
 	}
 	if model.selected != "" {
 		t.Errorf("selected = %q, want empty (cancelled)", model.selected)
+	}
+}
+
+func TestNewModelWithRendererAwareTheme(t *testing.T) {
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	theme := DefaultTheme().WithRenderer(r)
+	m := newModel(RunOptions{Theme: theme})
+
+	if m.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", m.state, stateInput)
+	}
+	if m.theme.renderer != r {
+		t.Error("model theme should preserve the renderer")
+	}
+}
+
+func TestNewSelectorModelWithRendererAwareTheme(t *testing.T) {
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	theme := DefaultTheme().WithRenderer(r)
+	items := []string{"cmd1", "cmd2"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, theme)
+
+	if m.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d)", m.state, stateSelect)
+	}
+	if m.theme.renderer != r {
+		t.Error("selector model theme should preserve the renderer")
 	}
 }
 

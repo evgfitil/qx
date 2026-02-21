@@ -80,10 +80,10 @@ Theme colors (selected item highlighting, pointer color, muted text, border colo
 
 ### Task 3: Use theme renderer for textarea and spinner styling (`internal/ui/model.go`)
 
-- [ ] in `newTextArea()`: use theme's `newStyle()` for `FocusedStyle.Text` and `FocusedStyle.CursorLine` instead of `lipgloss.NewStyle()`
-- [ ] update `newModel()` and `newSelectorModel()` to pass theme to `newTextArea()` so it can use the renderer
-- [ ] update `model_test.go`: verify model construction works with renderer-aware theme
-- [ ] run tests — must pass before next task
+- [x] in `newTextArea()`: use theme's `newStyle()` for `FocusedStyle.Text` and `FocusedStyle.CursorLine` instead of `lipgloss.NewStyle()`
+- [x] update `newModel()` and `newSelectorModel()` to pass theme to `newTextArea()` so it can use the renderer
+- [x] update `model_test.go`: verify model construction works with renderer-aware theme
+- [x] run tests — must pass before next task
 
 ### Task 4: Verify acceptance criteria
 

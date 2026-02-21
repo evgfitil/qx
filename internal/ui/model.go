@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
@@ -68,14 +67,14 @@ type Model struct {
 	selectedIndex int
 }
 
-func newTextArea(prompt string, promptStyle lipgloss.Style) textarea.Model {
+func newTextArea(theme Theme) textarea.Model {
 	ta := textarea.New()
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 256
-	ta.Prompt = prompt
-	ta.FocusedStyle.Prompt = promptStyle
-	ta.FocusedStyle.Text = lipgloss.NewStyle()
-	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.Prompt = theme.Prompt
+	ta.FocusedStyle.Prompt = theme.PromptStyle()
+	ta.FocusedStyle.Text = theme.newStyle()
+	ta.FocusedStyle.CursorLine = theme.newStyle()
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys())
 	ta.KeyMap.LineNext = key.NewBinding(key.WithKeys())
 	ta.KeyMap.LinePrevious = key.NewBinding(key.WithKeys())
@@ -84,7 +83,7 @@ func newTextArea(prompt string, promptStyle lipgloss.Style) textarea.Model {
 }
 
 func newModel(opts RunOptions) Model {
-	ta := newTextArea(opts.Theme.Prompt, opts.Theme.PromptStyle())
+	ta := newTextArea(opts.Theme)
 	ta.Placeholder = "describe the command you need..."
 	ta.MaxHeight = 3
 	ta.SetHeight(3)
@@ -115,7 +114,7 @@ func newModel(opts RunOptions) Model {
 }
 
 func newSelectorModel(items []string, display func(int) string, theme Theme) Model {
-	ta := newTextArea(theme.Prompt, theme.PromptStyle())
+	ta := newTextArea(theme)
 	ta.Placeholder = "filter..."
 	ta.MaxHeight = 1
 	ta.SetHeight(1)
