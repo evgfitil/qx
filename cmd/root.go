@@ -342,8 +342,9 @@ func saveToHistory(entry history.Entry) {
 }
 
 // handleSelectedCommand either shows the post-selection action menu or
-// prints the command to stdout. The action menu is shown only when
-// actionMenu is true AND stdout is a TTY. When the user chooses "revise",
+// prints the command to stdout. The action menu is shown when actionMenu
+// is true AND a TTY is available (stdout first, then stderr as fallback
+// for shell integration mode where stdout is captured). When the user chooses "revise",
 // it reads a refinement query and starts a new generation cycle with
 // follow-up context. History is saved only on the final action
 // (execute/copy/quit), not on intermediate revisions.

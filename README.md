@@ -190,7 +190,8 @@ History is stored in `~/.config/qx/history.json` and keeps the last 100 entries.
 By default, the selected command is printed to stdout. To enable the interactive
 action menu, set `action_menu: true` in your config (see [Action menu](#action-menu)).
 
-When the action menu is enabled and stdout is a TTY, it appears after selection:
+When the action menu is enabled and a TTY is available (stdout in direct mode,
+or stderr in shell integration mode), it appears after selection:
 
 ```text
   docker stop $(docker ps -q --filter ancestor=nginx)
