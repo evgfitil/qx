@@ -385,6 +385,84 @@ func TestInputViewHidesErrorWhenNil(t *testing.T) {
 	}
 }
 
+func TestEnterDuringLoadingIgnored(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test query",
+		Theme:        DefaultTheme(),
+	})
+
+	if m.state != stateLoading {
+		t.Fatalf("precondition: state = %d, want stateLoading", m.state)
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d) — Enter should be ignored", model.state, stateLoading)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil when Enter is ignored during loading")
+	}
+}
+
+func TestLoadingViewShowsSpinnerText(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+
+	view := m.View()
+
+	if !strings.Contains(view, "Generating commands...") {
+		t.Errorf("loading View() should contain 'Generating commands...', got %q", view)
+	}
+}
+
+func TestLoadingViewNotEmpty(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+
+	view := m.View()
+
+	if view == "" {
+		t.Error("loading View() should not be empty")
+	}
+}
+
+func TestCommandsMsgSuccessResetsScrollOffset(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+	m.scrollOffset = 5
+
+	cmds := []string{"cmd1", "cmd2"}
+	updated, _ := m.Update(commandsMsg{commands: cmds})
+	model := updated.(Model)
+
+	if model.scrollOffset != 0 {
+		t.Errorf("scrollOffset = %d, want 0 after commandsMsg", model.scrollOffset)
+	}
+}
+
+func TestCommandsMsgErrorPreservesQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "my query",
+		Theme:        DefaultTheme(),
+	})
+	m.state = stateLoading
+
+	updated, _ := m.Update(commandsMsg{err: errTest})
+	model := updated.(Model)
+
+	if model.originalQuery != "my query" {
+		t.Errorf("originalQuery = %q, want %q after error", model.originalQuery, "my query")
+	}
+}
+
 var errTest = testError("test error")
 
 type testError string

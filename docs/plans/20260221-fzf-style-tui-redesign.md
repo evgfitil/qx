@@ -187,13 +187,13 @@ All fields optional with fzf-like defaults.
 
 ### Task 6: Loading state (`internal/ui/model.go` Update, `internal/ui/view.go`)
 
-- [ ] implement loading state: spinner ticks, ignore Enter
-- [ ] implement commandsMsg handler: transition to stateSelect, populate commands/filtered
-- [ ] implement commandsMsg error handler: transition back to stateInput with error
-- [ ] implement loading state View: spinner + "Generating commands..." text
-- [ ] write tests for commandsMsg success → stateSelect with correct commands
-- [ ] write tests for commandsMsg error → stateInput with error set
-- [ ] run tests — must pass before next task
+- [x] implement loading state: spinner ticks, ignore Enter
+- [x] implement commandsMsg handler: transition to stateSelect, populate commands/filtered
+- [x] implement commandsMsg error handler: transition back to stateInput with error
+- [x] implement loading state View: spinner + "Generating commands..." text
+- [x] write tests for commandsMsg success → stateSelect with correct commands
+- [x] write tests for commandsMsg error → stateInput with error set
+- [x] run tests — must pass before next task
 
 ### Task 7: Selector state (`internal/ui/view.go`, `internal/ui/model.go`)
 

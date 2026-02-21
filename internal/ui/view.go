@@ -23,7 +23,9 @@ func (m Model) View() string {
 		}
 
 	case stateLoading:
-		// TODO: Task 6
+		b.WriteString(m.spinner.View())
+		b.WriteString(m.theme.MutedStyle().Render(" Generating commands..."))
+		b.WriteString("\n")
 
 	case stateSelect:
 		// TODO: Task 7
