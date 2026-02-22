@@ -111,12 +111,12 @@ Bug 2 fix — clear menu after action chosen:
 
 ### Task 3: Verify acceptance criteria
 
-- [ ] verify: Execute() in shell integration mode doesn't leak output to stdout pipe
-- [ ] verify: Execute() in normal mode still outputs to stdout
-- [ ] verify: action menu is erased after action chosen in shell integration mode
-- [ ] verify: action menu spacing preserved in normal mode
-- [ ] run full test suite (`go test ./...`)
-- [ ] build binary (`go build -o qx .`)
+- [x] verify: Execute() in shell integration mode doesn't leak output to stdout pipe
+- [x] verify: Execute() in normal mode still outputs to stdout
+- [x] verify: action menu is erased after action chosen in shell integration mode
+- [x] verify: action menu spacing preserved in normal mode
+- [x] run full test suite (`go test ./...`)
+- [x] build binary (`go build -o qx .`)
 
 ## Technical Details
 
