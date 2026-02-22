@@ -153,13 +153,13 @@ Use the `tui-test` MCP server to test shell integration in a real zsh session.
 
 ### Task 2: Verify acceptance criteria
 
-- [ ] verify: shell scripts handle exit 0 with empty result (clears buffer)
-- [ ] verify: shell scripts handle exit 0 with non-empty result (sets buffer to command)
-- [ ] verify: shell scripts handle exit 130 with non-empty result (preserves query)
-- [ ] verify: shell scripts handle exit 130 with empty result (buffer unchanged)
-- [ ] verify: zsh script has `zle -I` for display invalidation
-- [ ] run full test suite (`go test ./...`)
-- [ ] build binary (`go build -o qx .`)
+- [x] verify: shell scripts handle exit 0 with empty result (clears buffer)
+- [x] verify: shell scripts handle exit 0 with non-empty result (sets buffer to command)
+- [x] verify: shell scripts handle exit 130 with non-empty result (preserves query)
+- [x] verify: shell scripts handle exit 130 with empty result (buffer unchanged)
+- [x] verify: zsh script has `zle -I` for display invalidation
+- [x] run full test suite (`go test ./...`)
+- [x] build binary (`go build -o qx .`)
 
 ### Task 3: TUI integration test via `tui-test` MCP
 
