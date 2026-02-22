@@ -122,3 +122,79 @@ func TestExecute_InvalidShell(t *testing.T) {
 		t.Error("Execute with invalid shell expected error, got nil")
 	}
 }
+
+func TestExecute_ShellIntegration_NoOutputOnStdoutPipe(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+
+	// Open /dev/tty to simulate shell integration mode (stderr=TTY).
+	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+	if err != nil {
+		t.Skip("skipping: /dev/tty not available")
+	}
+	defer func() { _ = tty.Close() }()
+
+	// Set stderr to /dev/tty (TTY) and stdout to a pipe.
+	origStderr := os.Stderr
+	os.Stderr = tty
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	execErr := Execute("echo hello")
+	_ = w.Close()
+
+	if execErr != nil {
+		t.Fatalf("Execute returned error: %v", execErr)
+	}
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if len(out) != 0 {
+		t.Errorf("expected no output on stdout pipe in shell integration mode, got %q", string(out))
+	}
+}
+
+func TestExecute_NormalMode_OutputOnStdout(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+
+	// Both stdout and stderr are pipes — not shell integration mode.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+	defer func() { _ = stderrR.Close() }()
+
+	origStderr := os.Stderr
+	os.Stderr = stderrW
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	execErr := Execute("echo hello")
+	_ = w.Close()
+	_ = stderrW.Close()
+
+	if execErr != nil {
+		t.Fatalf("Execute returned error: %v", execErr)
+	}
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if string(out) != "hello\n" {
+		t.Errorf("expected output on stdout in normal mode, got %q", string(out))
+	}
+}

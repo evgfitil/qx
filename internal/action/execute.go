@@ -27,15 +27,34 @@ func detectShell() string {
 	return "/bin/sh"
 }
 
-// Execute runs the given command string in the user's shell
-// with inherited stdout and stderr. If stdin is a terminal it is passed through;
-// otherwise (pipe already consumed) /dev/tty is opened so the subprocess can
-// receive interactive input.
+// Execute runs the given command string in the user's shell.
+// In shell integration mode (stdout=pipe, stderr=TTY), output is routed to
+// /dev/tty so it appears on the terminal instead of being captured by $().
+// If stdin is a terminal it is passed through; otherwise /dev/tty is opened
+// so the subprocess can receive interactive input.
 func Execute(command string) error {
 	shell := detectShell()
 	cmd := exec.Command(shell, "-c", command)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+
+	stdoutIsPipe := !isatty.IsTerminal(os.Stdout.Fd()) &&
+		!isatty.IsCygwinTerminal(os.Stdout.Fd())
+	stderrIsTTY := isatty.IsTerminal(os.Stderr.Fd()) ||
+		isatty.IsCygwinTerminal(os.Stderr.Fd())
+
+	if stdoutIsPipe && stderrIsTTY {
+		ttyOut, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+		if err == nil {
+			defer func() { _ = ttyOut.Close() }()
+			cmd.Stdout = ttyOut
+			cmd.Stderr = ttyOut
+		} else {
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		}
+	} else {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 
 	if isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd()) {
 		cmd.Stdin = os.Stdin
