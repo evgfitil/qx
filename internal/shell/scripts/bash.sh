@@ -3,7 +3,10 @@ __qx_widget() {
     local result
     result=$("$qx_cmd" --query "$READLINE_LINE" </dev/tty 2>/dev/tty)
     local exit_code=$?
-    if [[ ($exit_code -eq 0 || $exit_code -eq 130) && -n "$result" ]]; then
+    if [[ $exit_code -eq 0 ]]; then
+        READLINE_LINE="$result"
+        READLINE_POINT=${#result}
+    elif [[ $exit_code -eq 130 && -n "$result" ]]; then
         READLINE_LINE="$result"
         READLINE_POINT=${#result}
     fi

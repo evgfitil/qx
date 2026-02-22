@@ -72,3 +72,80 @@ func TestScriptContent(t *testing.T) {
 		})
 	}
 }
+
+// TestBashSplitCondition verifies bash script uses split exit code handling:
+// exit 0 always updates buffer (even empty result), exit 130 only if non-empty.
+func TestBashSplitCondition(t *testing.T) {
+	script, err := Script("bash")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// exit 0 branch must not require -n check
+	if !strings.Contains(script, `$exit_code -eq 0`) {
+		t.Error("bash script should contain separate exit 0 check")
+	}
+
+	// exit 130 branch must require -n "$result"
+	if !strings.Contains(script, `$exit_code -eq 130 && -n "$result"`) {
+		t.Error("bash script should check -n for exit 130 only")
+	}
+
+	// old combined condition must not be present
+	if strings.Contains(script, `($exit_code -eq 0 || $exit_code -eq 130) && -n "$result"`) {
+		t.Error("bash script should not use combined condition with -n check for both exit codes")
+	}
+}
+
+// TestZshSplitConditionAndInvalidate verifies zsh script uses split exit code
+// handling and calls zle -I before zle reset-prompt.
+func TestZshSplitConditionAndInvalidate(t *testing.T) {
+	script, err := Script("zsh")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(script, `$exit_code -eq 0`) {
+		t.Error("zsh script should contain separate exit 0 check")
+	}
+
+	if !strings.Contains(script, `$exit_code -eq 130 && -n "$result"`) {
+		t.Error("zsh script should check -n for exit 130 only")
+	}
+
+	if strings.Contains(script, `($exit_code -eq 0 || $exit_code -eq 130) && -n "$result"`) {
+		t.Error("zsh script should not use combined condition with -n check for both exit codes")
+	}
+
+	// zle -I must appear before zle reset-prompt
+	if !strings.Contains(script, "zle -I") {
+		t.Error("zsh script should contain 'zle -I' for display invalidation")
+	}
+
+	iIdx := strings.Index(script, "zle -I")
+	rpIdx := strings.Index(script, "zle reset-prompt")
+	if iIdx >= rpIdx {
+		t.Error("'zle -I' must appear before 'zle reset-prompt'")
+	}
+}
+
+// TestFishSplitCondition verifies fish script uses split exit code handling.
+func TestFishSplitCondition(t *testing.T) {
+	script, err := Script("fish")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(script, `$exit_code -eq 0`) {
+		t.Error("fish script should contain separate exit 0 check")
+	}
+
+	if !strings.Contains(script, `$exit_code -eq 130 -a -n "$result"`) {
+		t.Error("fish script should check -n for exit 130 only")
+	}
+
+	// old combined condition must not be present
+	if strings.Contains(script, `$exit_code -eq 0 -o $exit_code -eq 130`) {
+		t.Error("fish script should not use combined condition for both exit codes")
+	}
+}
