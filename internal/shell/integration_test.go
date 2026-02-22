@@ -86,6 +86,15 @@ func TestBashSplitCondition(t *testing.T) {
 		t.Error("bash script should contain separate exit 0 check")
 	}
 
+	// exit 0 condition line must not include -n (the whole point of the fix)
+	for _, line := range strings.Split(script, "\n") {
+		if strings.Contains(line, "$exit_code -eq 0") && !strings.Contains(line, "130") {
+			if strings.Contains(line, "-n") {
+				t.Error("exit 0 condition must not include -n check — buffer should be set unconditionally")
+			}
+		}
+	}
+
 	// exit 130 branch must require -n "$result"
 	if !strings.Contains(script, `$exit_code -eq 130 && -n "$result"`) {
 		t.Error("bash script should check -n for exit 130 only")
@@ -107,6 +116,14 @@ func TestZshSplitConditionAndInvalidate(t *testing.T) {
 
 	if !strings.Contains(script, `$exit_code -eq 0`) {
 		t.Error("zsh script should contain separate exit 0 check")
+	}
+
+	for _, line := range strings.Split(script, "\n") {
+		if strings.Contains(line, "$exit_code -eq 0") && !strings.Contains(line, "130") {
+			if strings.Contains(line, "-n") {
+				t.Error("exit 0 condition must not include -n check — buffer should be set unconditionally")
+			}
+		}
 	}
 
 	if !strings.Contains(script, `$exit_code -eq 130 && -n "$result"`) {
@@ -138,6 +155,14 @@ func TestFishSplitCondition(t *testing.T) {
 
 	if !strings.Contains(script, `$exit_code -eq 0`) {
 		t.Error("fish script should contain separate exit 0 check")
+	}
+
+	for _, line := range strings.Split(script, "\n") {
+		if strings.Contains(line, "$exit_code -eq 0") && !strings.Contains(line, "130") {
+			if strings.Contains(line, "-n") {
+				t.Error("exit 0 condition must not include -n check — buffer should be set unconditionally")
+			}
+		}
 	}
 
 	if !strings.Contains(script, `$exit_code -eq 130 -a -n "$result"`) {
