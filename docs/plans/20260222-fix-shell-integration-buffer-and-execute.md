@@ -165,13 +165,13 @@ Use the `tui-test` MCP server to test shell integration in a real zsh session.
 
 Automated verification in real zsh session using `mcp__tui-test`. See "TUI Testing Setup" section above for environment details.
 
-- [ ] build fresh binary (`go build -o qx .`)
-- [ ] launch zsh session, set env vars (`QX_PATH`, `OPENAI_API_KEY` via `cat ~/.eliza_token`), load shell integration
-- [ ] **test Quit**: type text → `Ctrl+G` → submit → select → press `q` → capture screen → verify prompt contains selected command (LBUFFER updated)
-- [ ] **test Copy**: type text → `Ctrl+G` → submit → select → press `c` → capture screen → verify prompt is **empty** (LBUFFER cleared, old text gone)
-- [ ] **test Execute**: type text → `Ctrl+G` → submit → select → press `e` → capture screen → verify prompt is **empty** (LBUFFER cleared) and command output visible above prompt
-- [ ] **test Cancel**: type text → `Ctrl+G` → submit → select → press `Escape` → capture screen → verify prompt still contains **original text** (LBUFFER unchanged)
-- [ ] close tui-test session
+- [x] build fresh binary (`go build -o qx .`)
+- [x] launch zsh session, set env vars (`QX_PATH`, `OPENAI_API_KEY` via `cat ~/.eliza_token`), load shell integration
+- [x] **test Quit**: type text → `Ctrl+G` → submit → select → press `q` → capture screen → verify prompt contains selected command (LBUFFER updated)
+- [x] **test Copy**: type text → `Ctrl+G` → submit → select → press `c` → capture screen → verify prompt is **empty** (LBUFFER cleared, old text gone)
+- [x] **test Execute**: type text → `Ctrl+G` → submit → select → press `e` → capture screen → verify prompt is **empty** (LBUFFER cleared) and command output visible above prompt
+- [x] **test Cancel**: type text → `Ctrl+G` → submit → select → press `Escape` → capture screen → verify prompt still contains **original text** (LBUFFER unchanged)
+- [x] close tui-test session
 
 ## Technical Details
 
