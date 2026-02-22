@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/history"
 	"github.com/evgfitil/qx/internal/llm"
+	"github.com/evgfitil/qx/internal/tui"
 )
 
 func TestErrCancelled_CanBeExtracted(t *testing.T) {
@@ -44,9 +46,9 @@ func TestGenerateCommands_EmptyPipeContextSkipsGuard(t *testing.T) {
 	defer func() { forceSend = origForceSend }()
 	forceSend = false
 
-	// Point config to a nonexistent directory so config.Load() always fails,
-	// regardless of the developer's local environment.
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	// Isolate from developer's real config so config.Load() always fails.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	// With empty pipe context, only the query is checked.
 	// Should pass guard check and fail later at config.Load().
@@ -62,9 +64,14 @@ func TestGenerateCommands_EmptyPipeContextSkipsGuard(t *testing.T) {
 }
 
 func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
-	// When stdout is a pipe (non-TTY), handleSelectedCommand should print
-	// the command to stdout without showing the action menu.
+	// When stdout is a pipe (non-TTY) and stderr is also not a TTY,
+	// handleSelectedCommand should print the command to stdout without
+	// showing the action menu.
+	withMockFns(t)
 	withTempHistoryStore(t)
+
+	shouldPromptFn = func() bool { return false }
+	shouldPromptStderrFn = func() bool { return false }
 
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -75,7 +82,7 @@ func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 	os.Stdout = w
 	t.Cleanup(func() { os.Stdout = origStdout })
 
-	handleErr := handleSelectedCommand("echo hello", "test query", "")
+	handleErr := handleSelectedCommand("echo hello", "test query", "", true)
 	_ = w.Close()
 
 	if handleErr != nil {
@@ -93,7 +100,8 @@ func TestHandleSelectedCommand_NonTTY_PrintsToStdout(t *testing.T) {
 func TestRunInteractive_MultilineQueryDoesNotPanic(t *testing.T) {
 	// Smoke test: runInteractive with multiline query (line continuations)
 	// should not panic. Config error is expected in test environment.
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	multilineQuery := "ps aux \\\n\t| grep nginx \\\n\t| sort"
 
@@ -105,7 +113,8 @@ func TestRunInteractive_MultilineQueryDoesNotPanic(t *testing.T) {
 
 func TestRunInteractive_SimpleQueryDoesNotPanic(t *testing.T) {
 	// Smoke test: runInteractive with a simple query should not panic.
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	err := runInteractive("list all running containers", "")
 	if err == nil {
@@ -115,7 +124,11 @@ func TestRunInteractive_SimpleQueryDoesNotPanic(t *testing.T) {
 
 func TestHandleSelectedCommand_NonTTY_EmptyCommand(t *testing.T) {
 	// Even with empty command, non-TTY path should print and return nil.
+	withMockFns(t)
 	withTempHistoryStore(t)
+
+	shouldPromptFn = func() bool { return false }
+	shouldPromptStderrFn = func() bool { return false }
 
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -126,7 +139,7 @@ func TestHandleSelectedCommand_NonTTY_EmptyCommand(t *testing.T) {
 	os.Stdout = w
 	t.Cleanup(func() { os.Stdout = origStdout })
 
-	handleErr := handleSelectedCommand("", "test query", "")
+	handleErr := handleSelectedCommand("", "test query", "", true)
 	_ = w.Close()
 
 	if handleErr != nil {
@@ -149,6 +162,24 @@ func withTempHistoryStore(t *testing.T) *history.Store {
 	newHistoryStore = func() (*history.Store, error) { return store, nil }
 	t.Cleanup(func() { newHistoryStore = orig })
 	return store
+}
+
+// withTestConfig sets up a test config environment with a config file.
+// actionMenu controls the action_menu setting in the generated config.
+func withTestConfig(t *testing.T, actionMenu bool) {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("OPENAI_API_KEY", "test-key")
+
+	configDir := filepath.Join(dir, ".config", "qx")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+	content := fmt.Sprintf("action_menu: %v\n", actionMenu)
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
 }
 
 func TestSaveToHistory_PersistsEntry(t *testing.T) {
@@ -217,6 +248,7 @@ func TestSaveToHistory_StoreCreationError(t *testing.T) {
 
 func TestRunLast_WithHistory(t *testing.T) {
 	store := withTempHistoryStore(t)
+	withTestConfig(t, false)
 
 	_ = store.Add(history.Entry{
 		Query:     "find large files",
@@ -250,6 +282,7 @@ func TestRunLast_WithHistory(t *testing.T) {
 
 func TestRunLast_EmptyHistory(t *testing.T) {
 	withTempHistoryStore(t)
+	withTestConfig(t, false)
 
 	err := runLast()
 	if err == nil {
@@ -261,6 +294,8 @@ func TestRunLast_EmptyHistory(t *testing.T) {
 }
 
 func TestRunLast_StoreCreationError(t *testing.T) {
+	withTestConfig(t, false)
+
 	orig := newHistoryStore
 	newHistoryStore = func() (*history.Store, error) {
 		return nil, fmt.Errorf("no home directory")
@@ -274,6 +309,106 @@ func TestRunLast_StoreCreationError(t *testing.T) {
 	want := "failed to access history: no home directory"
 	if got := err.Error(); got != want {
 		t.Errorf("error = %q, want %q", got, want)
+	}
+}
+
+func TestRunLast_ActionMenuFalse_PrintsWithoutMenu(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+	withTestConfig(t, false)
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	shouldPromptFn = func() bool { return true }
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := runLast()
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if menuCalled {
+		t.Error("action menu should not be called when action_menu is false in config")
+	}
+	if string(out) != "find . -size +100M\n" {
+		t.Errorf("output = %q, want %q", string(out), "find . -size +100M\n")
+	}
+}
+
+func TestRunLast_ActionMenuTrue_ShowsMenu(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+	withTestConfig(t, true)
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	shouldPromptFn = func() bool { return true }
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	err := runLast()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !menuCalled {
+		t.Error("action menu should be called when action_menu is true in config")
+	}
+}
+
+func TestRunLast_WorksWithoutValidConfig(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	// No valid config: HOME points to empty temp dir, no API key.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := runLast()
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("runLast() should work without valid config, got: %v", err)
+	}
+	if string(out) != "find . -size +100M\n" {
+		t.Errorf("output = %q, want %q", string(out), "find . -size +100M\n")
 	}
 }
 
@@ -401,27 +536,123 @@ func TestRun_ContinueWithoutQueryArg(t *testing.T) {
 }
 
 func TestRun_MutuallyExclusiveFlags(t *testing.T) {
+	withTempHistoryStore(t)
+	resetRootCmdFlags(t)
+
+	rootCmd.SetArgs([]string{"--last", "--history"})
+
+	err := rootCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for combined --last and --history")
+	}
+	if !strings.Contains(err.Error(), "if any flags in the group") {
+		t.Errorf("expected cobra mutual exclusion error, got: %q", err.Error())
+	}
+}
+
+func TestRun_SingleFlags_NoMutualExclusionError(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"last only", []string{"--last"}},
+		{"history only", []string{"--history"}},
+		{"continue with query", []string{"--continue", "refine"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withTempHistoryStore(t)
+			resetRootCmdFlags(t)
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("OPENAI_API_KEY", "")
+
+			rootCmd.SetArgs(tt.args)
+
+			err := rootCmd.Execute()
+			if err != nil && strings.Contains(err.Error(), "if any flags in the group") {
+				t.Errorf("single flag should not trigger mutual exclusion error: %v", err)
+			}
+		})
+	}
+}
+
+func TestRun_ShortFlagL_WorksAsLast(t *testing.T) {
+	store := withTempHistoryStore(t)
+	resetRootCmdFlags(t)
+	withTestConfig(t, false)
+
+	_ = store.Add(history.Entry{
+		Query:     "find large files",
+		Selected:  "find . -size +100M",
+		Timestamp: time.Now(),
+	})
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	rootCmd.SetArgs([]string{"-l"})
+	err := rootCmd.Execute()
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("qx -l error = %v", err)
+	}
+	if string(out) != "find . -size +100M\n" {
+		t.Errorf("output = %q, want %q", string(out), "find . -size +100M\n")
+	}
+}
+
+func TestRun_ShortFlagC_WorksAsContinue(t *testing.T) {
+	store := withTempHistoryStore(t)
+	resetRootCmdFlags(t)
+
+	_ = store.Add(history.Entry{
+		Query:     "find files",
+		Selected:  "find . -name '*.go'",
+		Timestamp: time.Now(),
+	})
+
+	// runContinue will fail at config.Load() in test env — that's expected.
+	// We just verify the flag is recognized and triggers the continue path.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
+
+	rootCmd.SetArgs([]string{"-c", "only large files"})
+	err := rootCmd.Execute()
+
+	if err == nil {
+		t.Fatal("expected error from config.Load() in test environment")
+	}
+	// Should reach generateCommands (config.Load fails), not flag parsing error
+	if strings.Contains(err.Error(), "unknown shorthand flag") {
+		t.Errorf("short flag -c not recognized: %v", err)
+	}
+}
+
+// resetRootCmdFlags saves and restores flag state for rootCmd.
+// Must be called in tests that use rootCmd.Execute() with SetArgs.
+func resetRootCmdFlags(t *testing.T) {
+	t.Helper()
 	origLast := lastFlag
 	origHistory := historyFlag
 	origContinue := continueFlag
 	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
 		lastFlag = origLast
 		historyFlag = origHistory
 		continueFlag = origContinue
+		for _, name := range []string{"last", "history", "continue"} {
+			if f := rootCmd.Flags().Lookup(name); f != nil {
+				f.Changed = false
+			}
+		}
 	})
-
-	lastFlag = true
-	historyFlag = true
-	continueFlag = false
-
-	err := run(rootCmd, []string{})
-	if err == nil {
-		t.Fatal("expected error for combined --last and --history")
-	}
-	want := "--last, --history, and --continue are mutually exclusive"
-	if got := err.Error(); got != want {
-		t.Errorf("error = %q, want %q", got, want)
-	}
 }
 
 func TestRunContinue_WithHistory(t *testing.T) {
@@ -435,7 +666,8 @@ func TestRunContinue_WithHistory(t *testing.T) {
 
 	// runContinue will try to load config and create LLM provider,
 	// which will fail in test environment. That's expected.
-	t.Setenv("XDG_CONFIG_HOME", "/nonexistent/path")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 
 	err := runContinue("only go files", "")
 	if err == nil {
@@ -457,14 +689,20 @@ func TestRunContinue_WithHistory(t *testing.T) {
 func withMockFns(t *testing.T) {
 	t.Helper()
 	origShouldPrompt := shouldPromptFn
+	origShouldPromptStderr := shouldPromptStderrFn
 	origPromptAction := promptActionFn
 	origReadRefinement := readRefinementFn
 	origGenerateCommands := generateCommandsFn
+	origUiRun := uiRunFn
+	origUiRunSelector := uiRunSelectorFn
 	t.Cleanup(func() {
 		shouldPromptFn = origShouldPrompt
+		shouldPromptStderrFn = origShouldPromptStderr
 		promptActionFn = origPromptAction
 		readRefinementFn = origReadRefinement
 		generateCommandsFn = origGenerateCommands
+		uiRunFn = origUiRun
+		uiRunSelectorFn = origUiRunSelector
 	})
 }
 
@@ -490,7 +728,7 @@ func TestHandleSelectedCommand_Revise_FollowUpContext(t *testing.T) {
 		return nil
 	}
 
-	err := handleSelectedCommand("find .", "find files", "some context")
+	err := handleSelectedCommand("find .", "find files", "some context", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -529,7 +767,7 @@ func TestHandleSelectedCommand_Revise_EmptyRefinement(t *testing.T) {
 		return "", action.ErrEmptyRefinement
 	}
 
-	err := handleSelectedCommand("find .", "find files", "")
+	err := handleSelectedCommand("find .", "find files", "", true)
 	if !errors.Is(err, ErrCancelled) {
 		t.Errorf("expected ErrCancelled, got %v", err)
 	}
@@ -546,7 +784,7 @@ func TestHandleSelectedCommand_Revise_ReadError(t *testing.T) {
 		return "", fmt.Errorf("failed to read from tty")
 	}
 
-	err := handleSelectedCommand("find .", "find files", "")
+	err := handleSelectedCommand("find .", "find files", "", true)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -575,7 +813,7 @@ func TestHandleSelectedCommand_Revise_HistorySavedOnFinalAction(t *testing.T) {
 	}
 	generateCommandsFn = func(query string, pipeContext string, followUp *llm.FollowUpContext) error {
 		// Simulate the second pick: call handleSelectedCommand with new command
-		return handleSelectedCommand("find . -r", query, pipeContext)
+		return handleSelectedCommand("find . -r", query, pipeContext, true)
 	}
 
 	r, w, _ := os.Pipe()
@@ -583,7 +821,7 @@ func TestHandleSelectedCommand_Revise_HistorySavedOnFinalAction(t *testing.T) {
 	os.Stdout = w
 	t.Cleanup(func() { os.Stdout = origStdout })
 
-	err := handleSelectedCommand("find .", "find files", "ctx")
+	err := handleSelectedCommand("find .", "find files", "ctx", true)
 	_ = w.Close()
 	_, _ = io.ReadAll(r)
 	_ = r.Close()
@@ -609,14 +847,18 @@ func TestHandleSelectedCommand_Revise_HistorySavedOnFinalAction(t *testing.T) {
 }
 
 func TestHandleSelectedCommand_NonTTY_SavesHistory(t *testing.T) {
+	withMockFns(t)
 	store := withTempHistoryStore(t)
+
+	shouldPromptFn = func() bool { return false }
+	shouldPromptStderrFn = func() bool { return false }
 
 	r, w, _ := os.Pipe()
 	origStdout := os.Stdout
 	os.Stdout = w
 	t.Cleanup(func() { os.Stdout = origStdout })
 
-	_ = handleSelectedCommand("echo hello", "greet", "pipe data")
+	_ = handleSelectedCommand("echo hello", "greet", "pipe data", true)
 	_ = w.Close()
 	_, _ = io.ReadAll(r)
 	_ = r.Close()
@@ -644,7 +886,7 @@ func TestHandleSelectedCommand_TTY_CancelledReturnsErrCancelled(t *testing.T) {
 		return action.ErrCancelled
 	}
 
-	err := handleSelectedCommand("echo hello", "test", "")
+	err := handleSelectedCommand("echo hello", "test", "", true)
 	if !errors.Is(err, ErrCancelled) {
 		t.Errorf("expected ErrCancelled, got %v", err)
 	}
@@ -660,7 +902,7 @@ func TestHandleSelectedCommand_TTY_ActionErrorSavesHistory(t *testing.T) {
 		return actionErr
 	}
 
-	err := handleSelectedCommand("bad-cmd", "run thing", "ctx")
+	err := handleSelectedCommand("bad-cmd", "run thing", "ctx", true)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -674,5 +916,289 @@ func TestHandleSelectedCommand_TTY_ActionErrorSavesHistory(t *testing.T) {
 	}
 	if entries[0].Selected != "bad-cmd" {
 		t.Errorf("Selected = %q, want %q", entries[0].Selected, "bad-cmd")
+	}
+}
+
+func TestHandleSelectedCommand_ActionMenuFalse_PrintsWithoutMenu(t *testing.T) {
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	shouldPromptFn = func() bool { return true }
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo test", "query", "", false)
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if menuCalled {
+		t.Error("action menu should not be called when actionMenu is false")
+	}
+	if string(out) != "echo test\n" {
+		t.Errorf("output = %q, want %q", string(out), "echo test\n")
+	}
+}
+
+func TestRunInteractive_ConfigError_PrintsToStderr(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
+
+	origStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	err := runInteractive("my query", "")
+	_ = w.Close()
+
+	stderrOut, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if !errors.Is(err, ErrCancelled) {
+		t.Fatalf("expected ErrCancelled, got %v", err)
+	}
+	if !strings.Contains(string(stderrOut), "Error:") {
+		t.Errorf("stderr should contain 'Error:', got %q", string(stderrOut))
+	}
+}
+
+func TestRunInteractive_WithMockedUI_SelectedResult(t *testing.T) {
+	withMockFns(t)
+	withTempHistoryStore(t)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "test-key")
+
+	uiRunFn = func(opts tui.RunOptions) (tui.Result, error) {
+		return tui.SelectedResult{Command: "ls -la", Query: "list files"}, nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := runInteractive("list files", "")
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(out) != "ls -la\n" {
+		t.Errorf("output = %q, want %q", string(out), "ls -la\n")
+	}
+}
+
+func TestRunInteractive_WithMockedUI_CancelledResult(t *testing.T) {
+	withMockFns(t)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "test-key")
+
+	uiRunFn = func(opts tui.RunOptions) (tui.Result, error) {
+		return tui.CancelledResult{Query: "list files"}, nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := runInteractive("list files", "")
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if !errors.Is(err, ErrCancelled) {
+		t.Fatalf("expected ErrCancelled, got %v", err)
+	}
+	if string(out) != "list files\n" {
+		t.Errorf("output = %q, want %q", string(out), "list files\n")
+	}
+}
+
+func TestRunHistory_WithMockedSelector_SelectsEntry(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	_ = store.Add(history.Entry{
+		Query:     "find files",
+		Selected:  "find . -name '*.go'",
+		Timestamp: time.Now(),
+	})
+
+	uiRunSelectorFn = func(items []string, display func(int) string, theme tui.Theme) (int, error) {
+		return 0, nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := runHistory()
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(out) != "find . -name '*.go'\n" {
+		t.Errorf("output = %q, want %q", string(out), "find . -name '*.go'\n")
+	}
+}
+
+func TestRunHistory_WithMockedSelector_Cancelled(t *testing.T) {
+	withMockFns(t)
+	store := withTempHistoryStore(t)
+
+	_ = store.Add(history.Entry{
+		Query:     "find files",
+		Selected:  "find . -name '*.go'",
+		Timestamp: time.Now(),
+	})
+
+	uiRunSelectorFn = func(items []string, display func(int) string, theme tui.Theme) (int, error) {
+		return -1, nil
+	}
+
+	err := runHistory()
+	if !errors.Is(err, ErrCancelled) {
+		t.Fatalf("expected ErrCancelled, got %v", err)
+	}
+}
+
+func TestHandleSelectedCommand_StdoutPipe_StderrTTY_ActionMenuTrue_ShowsMenu(t *testing.T) {
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	// stdout is pipe (not TTY), stderr is TTY, actionMenu enabled
+	shouldPromptFn = func() bool { return false }
+	shouldPromptStderrFn = func() bool { return true }
+
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	err := handleSelectedCommand("echo hello", "test query", "", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !menuCalled {
+		t.Error("action menu should be shown when stdout=pipe, stderr=TTY, actionMenu=true")
+	}
+}
+
+func TestHandleSelectedCommand_StdoutPipe_StderrTTY_ActionMenuFalse_NoMenu(t *testing.T) {
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	// stdout is pipe, stderr is TTY, but actionMenu disabled
+	shouldPromptFn = func() bool { return false }
+	shouldPromptStderrFn = func() bool { return true }
+
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test query", "", false)
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if menuCalled {
+		t.Error("action menu should not be shown when actionMenu=false")
+	}
+	if string(out) != "echo hello\n" {
+		t.Errorf("output = %q, want %q", string(out), "echo hello\n")
+	}
+}
+
+func TestHandleSelectedCommand_StdoutTTY_ActionMenuTrue_ShowsMenu(t *testing.T) {
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	// stdout is TTY - menu should show regardless of stderr
+	shouldPromptFn = func() bool { return true }
+	shouldPromptStderrFn = func() bool { return false }
+
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	err := handleSelectedCommand("echo hello", "test query", "", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !menuCalled {
+		t.Error("action menu should be shown when stdout=TTY, actionMenu=true")
+	}
+}
+
+func TestHandleSelectedCommand_StdoutPipe_StderrNotTTY_ActionMenuTrue_NoMenu(t *testing.T) {
+	withMockFns(t)
+	withTempHistoryStore(t)
+
+	// stdout is pipe, stderr is also not TTY, actionMenu enabled
+	shouldPromptFn = func() bool { return false }
+	shouldPromptStderrFn = func() bool { return false }
+
+	menuCalled := false
+	promptActionFn = func(cmd string) error {
+		menuCalled = true
+		return nil
+	}
+
+	r, w, _ := os.Pipe()
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	err := handleSelectedCommand("echo hello", "test query", "", true)
+	_ = w.Close()
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if menuCalled {
+		t.Error("action menu should not be shown when neither stdout nor stderr is TTY")
+	}
+	if string(out) != "echo hello\n" {
+		t.Errorf("output = %q, want %q", string(out), "echo hello\n")
 	}
 }

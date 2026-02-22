@@ -10,14 +10,14 @@ Generate shell commands from natural language using LLM.
 
 ## Features
 
-- Natural language to shell command conversion
-- Multiple command variants with fuzzy selection
-- Interactive TUI with real-time filtering
-- Post-selection actions: execute, copy to clipboard, revise with follow-up, or print to stdout
-- Pipe command output as context for precise command generation
-- Shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support
-- Command history with `--last`, `--history`, and `--continue` for follow-up refinement
-- Support for OpenAI-compatible APIs
+- natural language to shell command conversion;
+- multiple command variants with fuzzy selection;
+- interactive TUI with real-time filtering;
+- optional post-selection action menu: execute, copy to clipboard, or revise with follow-up;
+- pipe command output as context for precise command generation;
+- shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support;
+- command history with `--last`, `--history`, and `--continue` for follow-up refinement;
+- support for OpenAI-compatible APIs.
 
 ## Installation
 
@@ -55,6 +55,32 @@ llm:
 **API Key**: Set via `OPENAI_API_KEY` environment variable or `llm.apikey` in config.
 Environment variable takes precedence if both are set.
 
+### Theme
+
+Customize the TUI appearance with an optional `theme` section (all fields have sensible defaults):
+
+```yaml
+theme:
+  prompt: "> "           # input prompt prefix
+  pointer: "▌"           # cursor indicator for selected item
+  selected_fg: "170"     # ANSI color or hex (#ff87d7)
+  match_fg: "205"        # input prompt color
+  text_fg: "252"         # normal text color
+  muted_fg: "241"        # counter and spinner text
+  border: "rounded"      # rounded | normal | thick | hidden
+  border_fg: "240"       # border color
+```
+
+### Action menu
+
+Control whether the post-selection action menu appears after command selection.
+When disabled (default), the selected command is printed to stdout.
+The `--history` subcommand always shows the action menu:
+
+```yaml
+action_menu: false  # default: false
+```
+
 ```bash
 # Option 1: environment variable
 export OPENAI_API_KEY="your-key-here"
@@ -87,10 +113,6 @@ input as initial query. Add instructions to modify or extend the command.
 **Prompt restoration**: Press Esc to cancel selection and restore your query
 to the command line for editing.
 
-**Error display**: If qx encounters an error (invalid configuration, API failure, etc.),
-the error message is displayed in the terminal. Normal cancellation via Esc does not
-produce error output.
-
 ### Direct mode
 
 ```bash
@@ -116,9 +138,9 @@ qx --query "git log"
 Pipe command output into qx to provide context for more precise generation:
 
 ```bash
-ls -la | qx "delete files larger than 1GB"
 docker ps | qx "stop all nginx containers"
-git branch | qx "delete all merged branches"
+kubectl get pods | qx "restart pods in CrashLoopBackOff"
+git log --oneline -20 | qx "revert the commit that added auth"
 ```
 
 Pipe mode also works with interactive TUI:
@@ -132,10 +154,10 @@ Stdin input is limited to 64KB. Content is checked for secrets before being sent
 
 ### History and follow-up
 
-Show the last selected command and open the action menu:
+Show the last selected command (action menu appears if enabled in config):
 
 ```bash
-qx --last
+qx --last    # or: qx -l
 ```
 
 Browse past queries with an interactive fuzzy picker:
@@ -147,7 +169,7 @@ qx --history
 Refine the last command with a follow-up query:
 
 ```bash
-qx --continue "make it recursive"
+qx --continue "make it recursive"    # or: qx -c "make it recursive"
 qx --continue "add verbose output"
 ```
 
@@ -161,7 +183,11 @@ History is stored in `~/.config/qx/history.json` and keeps the last 100 entries.
 
 ### Post-selection actions
 
-After selecting a command (in any mode), an action menu appears:
+By default, the selected command is printed to stdout. To enable the interactive
+action menu, set `action_menu: true` in your config (see [Action menu](#action-menu)).
+
+When the action menu is enabled and a TTY is available (stdout in direct mode,
+or stderr in shell integration mode), it appears after selection:
 
 ```text
   docker stop $(docker ps -q --filter ancestor=nginx)
@@ -178,9 +204,6 @@ After selecting a command (in any mode), an action menu appears:
 Revise lets you iteratively refine commands without leaving the flow.
 Press `r`, type a refinement (e.g., "make it recursive"), and qx generates
 new variants using the previous command as context.
-
-The menu only appears when running in a terminal. When stdout is redirected
-(e.g., via shell integration Ctrl+G), the command is printed to stdout directly.
 
 ## License
 

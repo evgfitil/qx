@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
-	"github.com/evgfitil/qx/internal/config"
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/llm"
 )
@@ -22,29 +21,35 @@ const (
 	stateInput state = iota
 	stateLoading
 	stateSelect
+	stateDone
 )
 
 const (
-	maxHeightPercent = 40 // percentage of terminal height for TUI
-	reservedLines    = 3  // lines reserved for textarea (1 line in filter mode) and counter
-	minHeight        = 5  // minimum TUI height
+	maxHeightPercent = 40
+	minHeight        = 5
+	reservedLines    = 4 // border top + textarea + counter + border bottom
+	generateTimeout  = 60 * time.Second
 )
 
-// commandsMsg is sent when LLM returns commands
+// commandsMsg is sent when LLM returns generated commands.
 type commandsMsg struct {
 	commands []string
 	err      error
 }
 
-// Model represents the TUI state
+// Model represents the unified TUI state machine.
 type Model struct {
 	state         state
+	theme         Theme
 	textArea      textarea.Model
 	spinner       spinner.Model
 	commands      []string
-	cursor        int
 	filtered      []string
+	filteredIdx   []int
+	cursor        int
+	scrollOffset  int
 	selected      string
+	prevFilter    string
 	err           error
 	llmConfig     llm.Config
 	forceSend     bool
@@ -52,52 +57,101 @@ type Model struct {
 	width         int
 	height        int
 	maxHeight     int
-	quitting      bool
 	originalQuery string
+	quitting      bool
+
+	// selector-only mode
+	selectorMode  bool
+	items         []string
+	displayFn     func(int) string
+	selectedIndex int
 }
 
-// NewModel creates a new TUI model with optional initial query and pipe context
-func NewModel(cfg llm.Config, initialQuery string, forceSend bool, pipeContext string) Model {
+func newTextArea(theme Theme) textarea.Model {
 	ta := textarea.New()
-	ta.Placeholder = "describe the command you need..."
 	ta.ShowLineNumbers = false
-	ta.MaxHeight = 3
-	ta.SetHeight(3)
 	ta.CharLimit = 256
-	ta.Prompt = "> "
-	ta.FocusedStyle.Prompt = promptStyle()
-	ta.FocusedStyle.Text = lipgloss.NewStyle()
-	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.Prompt = theme.Prompt
+	ta.FocusedStyle.Prompt = theme.PromptStyle()
+	ta.FocusedStyle.Text = theme.newStyle()
+	ta.FocusedStyle.CursorLine = theme.newStyle()
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys())
 	ta.KeyMap.LineNext = key.NewBinding(key.WithKeys())
 	ta.KeyMap.LinePrevious = key.NewBinding(key.WithKeys())
 	ta.Focus()
+	return ta
+}
 
-	if initialQuery != "" {
-		ta.SetValue(initialQuery)
-		ta.CursorEnd()
-	}
+func newModel(opts RunOptions) Model {
+	ta := newTextArea(opts.Theme)
+	ta.Placeholder = "describe the command you need..."
+	ta.MaxHeight = 1
+	ta.SetHeight(1)
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = loadingStyle()
+	s.Style = opts.Theme.MutedStyle()
+
+	if opts.InitialQuery != "" {
+		ta.SetValue(opts.InitialQuery)
+		ta.CursorEnd()
+	}
 
 	return Model{
-		state:       stateInput,
-		textArea:    ta,
-		spinner:     s,
-		llmConfig:   cfg,
-		forceSend:   forceSend,
-		pipeContext: pipeContext,
-		maxHeight:   10,
+		state:         stateInput,
+		theme:         opts.Theme,
+		textArea:      ta,
+		spinner:       s,
+		llmConfig:     opts.LLMConfig,
+		forceSend:     opts.ForceSend,
+		pipeContext:   opts.PipeContext,
+		maxHeight:     minHeight,
+		selectedIndex: -1,
 	}
 }
 
+func newSelectorModel(items []string, display func(int) string, theme Theme) Model {
+	ta := newTextArea(theme)
+	ta.Placeholder = "filter..."
+	ta.MaxHeight = 1
+	ta.SetHeight(1)
+
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = theme.MutedStyle()
+
+	idx := make([]int, len(items))
+	for i := range items {
+		idx[i] = i
+	}
+
+	return Model{
+		state:         stateSelect,
+		theme:         theme,
+		textArea:      ta,
+		spinner:       s,
+		maxHeight:     minHeight,
+		selectorMode:  true,
+		items:         items,
+		filtered:      items,
+		filteredIdx:   idx,
+		displayFn:     display,
+		selectedIndex: -1,
+	}
+}
+
+// Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
+	if m.state == stateLoading {
+		return tea.Batch(
+			m.spinner.Tick,
+			generateCommands(m.originalQuery, m.llmConfig, m.pipeContext),
+		)
+	}
 	return textarea.Blink
 }
 
-// Update implements tea.Model
+// Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
@@ -111,6 +165,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
+			m.state = stateDone
 			m.quitting = true
 			return m, tea.Quit
 
@@ -118,13 +173,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEnter()
 
 		case tea.KeyUp:
-			if m.state == stateSelect && m.cursor > 0 {
-				m.cursor--
+			if m.state == stateSelect {
+				m.moveCursor(-1)
+				return m, nil
 			}
 
 		case tea.KeyDown:
-			if m.state == stateSelect && m.cursor < len(m.filtered)-1 {
-				m.cursor++
+			if m.state == stateSelect {
+				m.moveCursor(1)
+				return m, nil
 			}
 		}
 
@@ -134,14 +191,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = stateInput
 			return m, nil
 		}
+
+		if len(msg.commands) == 0 {
+			m.err = fmt.Errorf("no commands generated")
+			m.state = stateInput
+			return m, nil
+		}
+
 		m.commands = msg.commands
 		m.filtered = msg.commands
+		m.filteredIdx = make([]int, len(msg.commands))
+		for i := range msg.commands {
+			m.filteredIdx[i] = i
+		}
 		m.cursor = 0
-		m.state = stateSelect
+		m.scrollOffset = 0
+
+		if len(msg.commands) == 1 {
+			m.selected = msg.commands[0]
+			m.state = stateDone
+			m.quitting = true
+			return m, tea.Quit
+		}
+
 		m.textArea.SetValue("")
-		m.textArea.Placeholder = "filter results..."
+		m.textArea.Placeholder = "filter..."
 		m.textArea.MaxHeight = 1
 		m.textArea.SetHeight(1)
+		m.prevFilter = ""
+		m.state = stateSelect
 		return m, nil
 
 	case spinner.TickMsg:
@@ -156,9 +234,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.textArea, cmd = m.textArea.Update(msg)
 		cmds = append(cmds, cmd)
+	}
 
-		if m.state == stateSelect {
-			m = m.updateFilter()
+	if m.state == stateSelect {
+		if current := m.textArea.Value(); current != m.prevFilter {
+			m.prevFilter = current
+			m.applyFilter()
 		}
 	}
 
@@ -180,121 +261,26 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 
 		m.state = stateLoading
 		m.originalQuery = query
+		m.err = nil
 		return m, tea.Batch(
 			m.spinner.Tick,
 			generateCommands(query, m.llmConfig, m.pipeContext),
 		)
 
 	case stateSelect:
-		if len(m.filtered) > 0 {
-			m.selected = m.filtered[m.cursor]
-			m.quitting = true
-			return m, tea.Quit
+		if len(m.filtered) == 0 {
+			return m, nil
 		}
-
-	case stateLoading:
-		// ignore Enter during loading
+		if m.selectorMode {
+			m.selectedIndex = m.filteredIdx[m.cursor]
+		}
+		m.selected = m.filtered[m.cursor]
+		m.state = stateDone
+		m.quitting = true
+		return m, tea.Quit
 	}
+
 	return m, nil
-}
-
-func (m Model) updateFilter() Model {
-	filter := strings.ToLower(m.textArea.Value())
-	if filter == "" {
-		m.filtered = m.commands
-	} else {
-		m.filtered = nil
-		for _, cmd := range m.commands {
-			if strings.Contains(strings.ToLower(cmd), filter) {
-				m.filtered = append(m.filtered, cmd)
-			}
-		}
-	}
-	if m.cursor >= len(m.filtered) {
-		m.cursor = max(0, len(m.filtered)-1)
-	}
-	return m
-}
-
-func truncateWithEllipsis(s string, maxWidth int) string {
-	if maxWidth <= 3 {
-		return s
-	}
-	if len(s) <= maxWidth {
-		return s
-	}
-	return s[:maxWidth-3] + "..."
-}
-
-func wrapCommand(s string, width int) string {
-	if width <= 0 {
-		return s
-	}
-	return lipgloss.NewStyle().Width(width).Render(s)
-}
-
-// View implements tea.Model
-func (m Model) View() string {
-	if m.quitting && m.selected == "" {
-		return ""
-	}
-
-	var b strings.Builder
-	b.WriteString(m.textArea.View())
-	b.WriteString("\n")
-
-	switch m.state {
-	case stateInput:
-		if m.err != nil {
-			b.WriteString(errorStyle().Render(fmt.Sprintf("Error: %v", m.err)))
-			b.WriteString("\n")
-		}
-
-	case stateLoading:
-		b.WriteString(m.spinner.View())
-		b.WriteString(" Generating commands...")
-		b.WriteString("\n")
-
-	case stateSelect:
-		maxItems := max(m.maxHeight-reservedLines, 1)
-
-		start := 0
-		if m.cursor >= maxItems {
-			start = m.cursor - maxItems + 1
-		}
-		end := min(start+maxItems, len(m.filtered))
-
-		for i := start; i < end; i++ {
-			cmd := m.filtered[i]
-			if i == m.cursor {
-				wrapped := wrapCommand("> "+cmd, m.width)
-				b.WriteString(selectedStyle().Render(wrapped))
-			} else {
-				truncated := truncateWithEllipsis("  "+cmd, m.width)
-				b.WriteString(normalStyle().Render(truncated))
-			}
-			b.WriteString("\n")
-		}
-
-		b.WriteString(counterStyle().Render(fmt.Sprintf("  %d/%d", len(m.filtered), len(m.commands))))
-		b.WriteString("\n")
-	}
-
-	return b.String()
-}
-
-// Result returns the outcome of TUI interaction.
-// Returns SelectedResult if a command was selected, CancelledResult otherwise.
-func (m Model) Result() Result {
-	if m.selected != "" {
-		return SelectedResult{Command: m.selected, Query: m.originalQuery}
-	}
-	// In select/loading states, textArea may contain filter text or still has query,
-	// but originalQuery always has the submitted query
-	if (m.state == stateSelect || m.state == stateLoading) && m.originalQuery != "" {
-		return CancelledResult{Query: m.originalQuery}
-	}
-	return CancelledResult{Query: m.textArea.Value()}
 }
 
 func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd {
@@ -304,7 +290,7 @@ func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd 
 			return commandsMsg{err: err}
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), config.DefaultTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), generateTimeout)
 		defer cancel()
 
 		commands, err := provider.Generate(ctx, query, cfg.Count, pipeContext, nil)
@@ -318,4 +304,83 @@ func generateCommands(query string, cfg llm.Config, pipeContext string) tea.Cmd 
 
 		return commandsMsg{commands: commands}
 	}
+}
+
+func (m *Model) moveCursor(delta int) {
+	if len(m.filtered) == 0 {
+		return
+	}
+	m.cursor += delta
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	if m.cursor >= len(m.filtered) {
+		m.cursor = len(m.filtered) - 1
+	}
+	m.adjustScroll()
+}
+
+func (m *Model) adjustScroll() {
+	visible := m.visibleItemCount()
+	if visible <= 0 {
+		return
+	}
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+	if m.cursor >= m.scrollOffset+visible {
+		m.scrollOffset = m.cursor - visible + 1
+	}
+}
+
+func (m Model) visibleItemCount() int {
+	visible := m.maxHeight - reservedLines
+	if visible < 1 {
+		visible = 1
+	}
+	return visible
+}
+
+func (m *Model) applyFilter() {
+	query := strings.ToLower(strings.TrimSpace(m.textArea.Value()))
+	m.filtered = nil
+	m.filteredIdx = nil
+
+	if m.selectorMode {
+		for i := range m.items {
+			display := m.displayFn(i)
+			if query == "" || strings.Contains(strings.ToLower(display), query) {
+				m.filtered = append(m.filtered, m.items[i])
+				m.filteredIdx = append(m.filteredIdx, i)
+			}
+		}
+	} else {
+		for i, cmd := range m.commands {
+			if query == "" || strings.Contains(strings.ToLower(cmd), query) {
+				m.filtered = append(m.filtered, cmd)
+				m.filteredIdx = append(m.filteredIdx, i)
+			}
+		}
+	}
+
+	m.cursor = 0
+	m.scrollOffset = 0
+}
+
+func (m Model) getDisplayText(filteredIndex int) string {
+	if m.selectorMode && m.displayFn != nil {
+		return m.displayFn(m.filteredIdx[filteredIndex])
+	}
+	return m.filtered[filteredIndex]
+}
+
+// Result returns the outcome of TUI interaction.
+func (m Model) Result() Result {
+	if m.selected != "" {
+		return SelectedResult{Command: m.selected, Query: m.originalQuery}
+	}
+	if m.originalQuery != "" {
+		return CancelledResult{Query: m.originalQuery}
+	}
+	return CancelledResult{Query: m.textArea.Value()}
 }

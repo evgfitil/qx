@@ -6,7 +6,9 @@ function __qx_widget
     set -l current_buffer (commandline)
     set -l result ($qx_cmd --query "$current_buffer" 2>/dev/tty </dev/tty | string collect)
     set -l exit_code $pipestatus[1]
-    if test \( $exit_code -eq 0 -o $exit_code -eq 130 \) -a -n "$result"
+    if test $exit_code -eq 0
+        commandline -r -- "$result"
+    else if test $exit_code -eq 130 -a -n "$result"
         commandline -r -- "$result"
     end
     commandline -f repaint

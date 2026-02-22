@@ -14,6 +14,16 @@ import (
 // ErrCancelled indicates the user cancelled without choosing an action.
 var ErrCancelled = errors.New("action cancelled")
 
+// inShellIntegration reports whether qx is running in shell integration mode:
+// stdout is captured by $() (pipe) while stderr goes to /dev/tty (terminal).
+var inShellIntegration = func() bool {
+	stdoutIsPipe := !isatty.IsTerminal(os.Stdout.Fd()) &&
+		!isatty.IsCygwinTerminal(os.Stdout.Fd())
+	stderrIsTTY := isatty.IsTerminal(os.Stderr.Fd()) ||
+		isatty.IsCygwinTerminal(os.Stderr.Fd())
+	return stdoutIsPipe && stderrIsTTY
+}
+
 // ReviseRequestedError indicates the user wants to revise the selected command.
 type ReviseRequestedError struct{}
 
@@ -36,6 +46,12 @@ const (
 // interacting directly with the terminal and should see the action menu.
 func ShouldPrompt() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
+}
+
+// ShouldPromptStderr returns true if stderr is a TTY. Used in shell
+// integration mode where stdout is captured but stderr goes to /dev/tty.
+func ShouldPromptStderr() bool {
+	return isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())
 }
 
 // readKeypress reads a single keypress from the given reader, which should
@@ -101,9 +117,15 @@ func promptActionWith(command string, ttyReader io.Reader) error {
 		return err
 	}
 
-	fmt.Fprintln(os.Stderr)
-	if act == ActionExecute {
+	if inShellIntegration() {
+		// Erase menu: move up 3 lines (to the blank line before command),
+		// then clear from cursor to end of screen.
+		fmt.Fprintf(os.Stderr, "\r\033[3A\033[J")
+	} else {
 		fmt.Fprintln(os.Stderr)
+		if act == ActionExecute {
+			fmt.Fprintln(os.Stderr)
+		}
 	}
 
 	return dispatchAction(act, command)

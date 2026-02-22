@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- fzf-style inline TUI replacing the old alternate-screen interface
+- type-to-filter with fuzzy matching in command selector
+- auto-select when LLM returns a single command
+- configurable theme system (`theme` section in config)
+- `action_menu` config option to control post-selection menu visibility
+- short flags: `-l` for `--last`, `-c` for `--continue`
+- revise action: iteratively refine commands with follow-up context
+- `zle -I` display invalidation in zsh shell integration for correct prompt positioning
+
+### Changed
+
+- TUI renders inline (no alternate screen), limited to ~40% terminal height
+- action menu is now opt-in via `action_menu: true` in config (default: false)
+- `--last` respects `action_menu` config setting
+- textarea auto-resizes to content instead of fixed height
+
+### Fixed
+
+- shell buffer not cleared after Execute/Copy in shell integration mode
+- Execute output captured by `$()` instead of appearing on terminal
+- action menu not showing in shell integration mode (stderr TTY fallback)
+- theme colors not rendering when stdout is piped (explicit `/dev/tty` renderer)
+- terminal echo disabled after Revise input (bubbletea leaving raw mode)
+- refinement prompt text remaining on screen after input
+- extra blank line after Execute output with powerlevel10k
+- action menu not erased from terminal after action chosen
+
 ## [0.7.3] - 2026-02-17
 
 ### Fixed

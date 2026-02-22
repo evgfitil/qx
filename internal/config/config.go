@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/evgfitil/qx/internal/llm"
+	"github.com/evgfitil/qx/internal/tui"
 )
 
 const (
@@ -22,7 +23,35 @@ const (
 
 // Config represents the application configuration
 type Config struct {
-	LLM LLMConfig `mapstructure:"llm"`
+	LLM        LLMConfig   `mapstructure:"llm"`
+	Theme      ThemeConfig `mapstructure:"theme"`
+	ActionMenu bool        `mapstructure:"action_menu"`
+}
+
+// ThemeConfig contains TUI theme configuration
+type ThemeConfig struct {
+	Prompt     string `mapstructure:"prompt"`
+	Pointer    string `mapstructure:"pointer"`
+	SelectedFg string `mapstructure:"selected_fg"`
+	MatchFg    string `mapstructure:"match_fg"`
+	TextFg     string `mapstructure:"text_fg"`
+	MutedFg    string `mapstructure:"muted_fg"`
+	Border     string `mapstructure:"border"`
+	BorderFg   string `mapstructure:"border_fg"`
+}
+
+// ToTheme converts ThemeConfig to tui.Theme.
+func (tc ThemeConfig) ToTheme() tui.Theme {
+	return tui.Theme{
+		Prompt:     tc.Prompt,
+		Pointer:    tc.Pointer,
+		SelectedFg: tc.SelectedFg,
+		MatchFg:    tc.MatchFg,
+		TextFg:     tc.TextFg,
+		MutedFg:    tc.MutedFg,
+		Border:     tc.Border,
+		BorderFg:   tc.BorderFg,
+	}
 }
 
 // LLMConfig contains LLM-related configuration
@@ -59,6 +88,17 @@ func Load() (*Config, error) {
 	viper.SetDefault("llm.base_url", DefaultBaseURL)
 	viper.SetDefault("llm.model", DefaultModel)
 	viper.SetDefault("llm.count", DefaultCount)
+
+	defaults := tui.DefaultTheme()
+	viper.SetDefault("theme.prompt", defaults.Prompt)
+	viper.SetDefault("theme.pointer", defaults.Pointer)
+	viper.SetDefault("theme.selected_fg", defaults.SelectedFg)
+	viper.SetDefault("theme.match_fg", defaults.MatchFg)
+	viper.SetDefault("theme.text_fg", defaults.TextFg)
+	viper.SetDefault("theme.muted_fg", defaults.MutedFg)
+	viper.SetDefault("theme.border", defaults.Border)
+	viper.SetDefault("theme.border_fg", defaults.BorderFg)
+	viper.SetDefault("action_menu", false)
 
 	viper.MustBindEnv("llm.apikey", "OPENAI_API_KEY")
 

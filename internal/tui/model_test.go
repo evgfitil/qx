@@ -1,827 +1,1278 @@
 package tui
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"net/http/httptest"
+	"bytes"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/sashabaranov/go-openai"
-
-	"github.com/evgfitil/qx/internal/llm"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// newMockLLMServer creates a test HTTP server that captures the request body
-// and returns a predefined LLM response.
-func newMockLLMServer(t *testing.T, capturedBody *string, responseJSON string) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		*capturedBody = string(body)
+func TestNewModelWithoutQuery(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
 
-		resp := openai.ChatCompletionResponse{
-			Choices: []openai.ChatCompletionChoice{
-				{Message: openai.ChatCompletionMessage{Content: responseJSON}},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-}
-
-func TestModel_Result_CancelledOnEsc(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-	initialQuery := "list files"
-
-	m := NewModel(cfg, initialQuery, false, "")
-
-	// Simulate Esc press
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	model := updated.(Model)
-
-	result := model.Result()
-	cancelled, ok := result.(CancelledResult)
-	if !ok {
-		t.Fatal("expected result to be CancelledResult after Esc")
-	}
-	if cancelled.Query != initialQuery {
-		t.Errorf("expected Query = %q, got %q", initialQuery, cancelled.Query)
-	}
-}
-
-func TestModel_Result_SelectedOnEnter(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-
-	// Simulate receiving commands from LLM
-	m.commands = []string{"ls -la", "ls -lah", "ls -l"}
-	m.filtered = m.commands
-	m.state = stateSelect
-	m.cursor = 1 // select second command
-
-	// Simulate Enter press to select
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model := updated.(Model)
-
-	result := model.Result()
-	selected, ok := result.(SelectedResult)
-	if !ok {
-		t.Fatal("expected result to be SelectedResult after selection")
-	}
-	if selected.Command != "ls -lah" {
-		t.Errorf("expected Command = %q, got %q", "ls -lah", selected.Command)
-	}
-}
-
-func TestModel_Result_CancelledWithCtrlC(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-	initialQuery := "show processes"
-
-	m := NewModel(cfg, initialQuery, false, "")
-
-	// Simulate Ctrl+C press
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
-	model := updated.(Model)
-
-	result := model.Result()
-	cancelled, ok := result.(CancelledResult)
-	if !ok {
-		t.Fatal("expected result to be CancelledResult after Ctrl+C")
-	}
-	if cancelled.Query != initialQuery {
-		t.Errorf("expected Query = %q, got %q", initialQuery, cancelled.Query)
-	}
-}
-
-func TestModel_Result_NoActionYet(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "test query", false, "")
-
-	// No user action yet - model in initial state
-	result := m.Result()
-
-	// Should return CancelledResult with current query when no action taken
-	_, ok := result.(CancelledResult)
-	if !ok {
-		t.Error("expected result to be CancelledResult when no action taken")
-	}
-}
-
-func TestModel_Result_EmptyQueryOnEsc(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	// Start with empty query
-	m := NewModel(cfg, "", false, "")
-
-	// Simulate Esc press
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	model := updated.(Model)
-
-	result := model.Result()
-	cancelled, ok := result.(CancelledResult)
-	if !ok {
-		t.Fatal("expected result to be CancelledResult after Esc")
-	}
-	if cancelled.Query != "" {
-		t.Errorf("expected Query = %q, got %q", "", cancelled.Query)
-	}
-}
-
-func TestModel_Result_ModifiedQueryOnEsc(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	initialQuery := "list files"
-	m := NewModel(cfg, initialQuery, false, "")
-
-	// Simulate typing additional text - send individual key messages
-	for _, r := range " with details" {
-		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
-		m = updated.(Model)
-	}
-
-	// Now the text input should contain "list files with details"
-	expectedQuery := "list files with details"
-	if m.textArea.Value() != expectedQuery {
-		t.Fatalf("precondition failed: expected input value %q, got %q", expectedQuery, m.textArea.Value())
-	}
-
-	// Simulate Esc press
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	model := updated.(Model)
-
-	result := model.Result()
-	cancelled, ok := result.(CancelledResult)
-	if !ok {
-		t.Fatal("expected result to be CancelledResult after Esc")
-	}
-
-	// Should return the modified query, not the initial one
-	if cancelled.Query != expectedQuery {
-		t.Errorf("expected Query = %q, got %q", expectedQuery, cancelled.Query)
-	}
-}
-
-func TestModel_Result_CancelledFromSelectState(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	originalQuery := "list files"
-	m := NewModel(cfg, originalQuery, false, "")
-
-	// Simulate the flow: user enters query, presses Enter, receives commands
-	m.originalQuery = originalQuery
-	m.commands = []string{"ls -la", "ls -lah", "ls -l"}
-	m.filtered = m.commands
-	m.state = stateSelect
-	m.textArea.SetValue("") // This happens when transitioning to stateSelect
-
-	// Simulate Esc press while in select state
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	model := updated.(Model)
-
-	result := model.Result()
-	cancelled, ok := result.(CancelledResult)
-	if !ok {
-		t.Fatal("expected result to be CancelledResult after Esc in select state")
-	}
-
-	// Should return the original query, not empty string
-	if cancelled.Query != originalQuery {
-		t.Errorf("expected Query = %q, got %q", originalQuery, cancelled.Query)
-	}
-}
-
-func TestModel_Result_CancelledFromLoadingState(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	originalQuery := "list files"
-	m := NewModel(cfg, originalQuery, false, "")
-
-	// Simulate the flow: user enters query and presses Enter, now in loading state
-	m.state = stateLoading
-	m.originalQuery = originalQuery
-
-	// Simulate Esc press while loading
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	model := updated.(Model)
-
-	result := model.Result()
-	cancelled, ok := result.(CancelledResult)
-	if !ok {
-		t.Fatal("expected result to be CancelledResult after Esc in loading state")
-	}
-
-	// Should return the original query
-	if cancelled.Query != originalQuery {
-		t.Errorf("expected Query = %q, got %q", originalQuery, cancelled.Query)
-	}
-}
-
-func TestNewModel_WithPipeContext(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-	pipeCtx := "total 48\n-rw-r--r-- 1 user staff 1024 Jan 1 file.txt"
-
-	m := NewModel(cfg, "delete large files", false, pipeCtx)
-
-	if m.pipeContext != pipeCtx {
-		t.Errorf("expected pipeContext = %q, got %q", pipeCtx, m.pipeContext)
-	}
 	if m.state != stateInput {
-		t.Errorf("expected state = stateInput, got %d", m.state)
+		t.Errorf("state = %d, want stateInput (%d)", m.state, stateInput)
+	}
+	if m.originalQuery != "" {
+		t.Errorf("originalQuery = %q, want empty", m.originalQuery)
+	}
+	if m.selectedIndex != -1 {
+		t.Errorf("selectedIndex = %d, want -1", m.selectedIndex)
+	}
+	if m.maxHeight != minHeight {
+		t.Errorf("maxHeight = %d, want %d", m.maxHeight, minHeight)
 	}
 }
 
-func TestNewModel_WithoutPipeContext(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
+func TestNewModelWithQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "list files",
+		Theme:        DefaultTheme(),
+	})
+
+	if m.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", m.state, stateInput)
 	}
-
-	m := NewModel(cfg, "list files", false, "")
-
-	if m.pipeContext != "" {
-		t.Errorf("expected pipeContext = %q, got %q", "", m.pipeContext)
+	if m.originalQuery != "" {
+		t.Errorf("originalQuery = %q, want empty (set only on Enter)", m.originalQuery)
+	}
+	if m.textArea.Value() != "list files" {
+		t.Errorf("textArea value = %q, want %q", m.textArea.Value(), "list files")
 	}
 }
 
-func TestGenerateCommands_WithPipeContext(t *testing.T) {
-	var capturedBody string
-	server := newMockLLMServer(t, &capturedBody, `{"commands": ["docker stop abc"]}`)
-	defer server.Close()
+func TestNewModelInitReturnsBlinkForInput(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	cmd := m.Init()
 
-	cfg := llm.Config{
-		BaseURL: server.URL + "/v1",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-	pipeCtx := "CONTAINER ID\nabc123 nginx"
-
-	cmd := generateCommands("stop nginx", cfg, pipeCtx)
 	if cmd == nil {
-		t.Fatal("expected non-nil tea.Cmd")
-	}
-
-	msg := cmd()
-	cmdMsg, ok := msg.(commandsMsg)
-	if !ok {
-		t.Fatalf("expected commandsMsg, got %T", msg)
-	}
-	if cmdMsg.err != nil {
-		t.Fatalf("unexpected error: %v", cmdMsg.err)
-	}
-
-	// JSON encoding escapes angle brackets, so check for the content itself
-	if !strings.Contains(capturedBody, "abc123 nginx") {
-		t.Error("request should contain pipe context data")
-	}
-	if !strings.Contains(capturedBody, "Task: stop nginx") {
-		t.Error("request should contain 'Task:' prefix for the query")
+		t.Error("Init() returned nil, want textarea.Blink command")
 	}
 }
 
-func TestGenerateCommands_WithoutPipeContext(t *testing.T) {
-	var capturedBody string
-	server := newMockLLMServer(t, &capturedBody, `{"commands": ["ls -la"]}`)
-	defer server.Close()
+func TestNewModelInitReturnsBlinkWithQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+	cmd := m.Init()
 
-	cfg := llm.Config{
-		BaseURL: server.URL + "/v1",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	cmd := generateCommands("list files", cfg, "")
 	if cmd == nil {
-		t.Fatal("expected non-nil tea.Cmd")
-	}
-
-	msg := cmd()
-	cmdMsg, ok := msg.(commandsMsg)
-	if !ok {
-		t.Fatalf("expected commandsMsg, got %T", msg)
-	}
-	if cmdMsg.err != nil {
-		t.Fatalf("unexpected error: %v", cmdMsg.err)
-	}
-
-	if strings.Contains(capturedBody, "Task:") {
-		t.Error("request should not contain 'Task:' prefix when no pipe context")
+		t.Error("Init() returned nil, want textarea.Blink command")
 	}
 }
 
-func TestNewModel_TextAreaConfig(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
+func TestNewSelectorModel(t *testing.T) {
+	items := []string{"cmd1", "cmd2", "cmd3"}
+	display := func(i int) string { return items[i] }
+	m := newSelectorModel(items, display, DefaultTheme())
 
-	m := NewModel(cfg, "", false, "")
-
-	if m.textArea.ShowLineNumbers {
-		t.Error("expected ShowLineNumbers = false")
+	if m.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d)", m.state, stateSelect)
 	}
-	if m.textArea.MaxHeight != 3 {
-		t.Errorf("expected MaxHeight = 3, got %d", m.textArea.MaxHeight)
+	if !m.selectorMode {
+		t.Error("selectorMode = false, want true")
 	}
-	if m.textArea.CharLimit != 256 {
-		t.Errorf("expected CharLimit = 256, got %d", m.textArea.CharLimit)
+	if len(m.items) != 3 {
+		t.Errorf("items count = %d, want 3", len(m.items))
 	}
-	if m.textArea.Prompt != "> " {
-		t.Errorf("expected Prompt = %q, got %q", "> ", m.textArea.Prompt)
+	if len(m.filtered) != 3 {
+		t.Errorf("filtered count = %d, want 3", len(m.filtered))
 	}
-	if m.textArea.Placeholder != "describe the command you need..." {
-		t.Errorf("expected default placeholder, got %q", m.textArea.Placeholder)
+	if m.selectedIndex != -1 {
+		t.Errorf("selectedIndex = %d, want -1", m.selectedIndex)
 	}
 }
 
-func TestNewModel_TextAreaInitialQuery(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
+func TestWindowSizeMsg(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
 
-	initialQuery := "list running containers"
-	m := NewModel(cfg, initialQuery, false, "")
-
-	if m.textArea.Value() != initialQuery {
-		t.Errorf("expected textarea value = %q, got %q", initialQuery, m.textArea.Value())
-	}
-}
-
-func TestNewModel_TextAreaEmptyInitialQuery(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-
-	if m.textArea.Value() != "" {
-		t.Errorf("expected empty textarea value, got %q", m.textArea.Value())
-	}
-}
-
-func TestEnterKey_SubmitsInStateInput(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "list files", false, "")
-
-	// Enter in stateInput should transition to stateLoading (submission)
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	model := updated.(Model)
 
-	if model.state != stateLoading {
-		t.Errorf("expected state = stateLoading after Enter in stateInput, got %d", model.state)
+	if model.width != 120 {
+		t.Errorf("width = %d, want 120", model.width)
+	}
+	if model.height != 40 {
+		t.Errorf("height = %d, want 40", model.height)
+	}
+
+	wantMaxHeight := max(40*maxHeightPercent/100, minHeight)
+	if model.maxHeight != wantMaxHeight {
+		t.Errorf("maxHeight = %d, want %d", model.maxHeight, wantMaxHeight)
+	}
+}
+
+func TestWindowSizeMsgSmallTerminal(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
+	model := updated.(Model)
+
+	wantMaxHeight := max(10*maxHeightPercent/100, minHeight)
+	if model.maxHeight != wantMaxHeight {
+		t.Errorf("maxHeight = %d, want %d (minHeight should apply)", model.maxHeight, wantMaxHeight)
+	}
+	if model.maxHeight < minHeight {
+		t.Errorf("maxHeight = %d, should not be less than minHeight (%d)", model.maxHeight, minHeight)
+	}
+}
+
+func TestEscQuits(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
+	}
+	if model.selected != "" {
+		t.Errorf("selected = %q, want empty (cancelled)", model.selected)
 	}
 	if cmd == nil {
-		t.Error("expected non-nil command after Enter submission")
-	}
-	if model.originalQuery != "list files" {
-		t.Errorf("expected originalQuery = %q, got %q", "list files", model.originalQuery)
+		t.Error("cmd = nil, want tea.Quit")
 	}
 }
 
-func TestEnterKey_SelectsInStateSelect(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
+func TestCtrlCQuits(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
 
-	m := NewModel(cfg, "", false, "")
-	m.commands = []string{"ls -la", "ls -lah"}
-	m.filtered = m.commands
-	m.state = stateSelect
-	m.cursor = 0
-
-	// Enter in stateSelect should select the command and quit
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	model := updated.(Model)
 
-	if model.selected != "ls -la" {
-		t.Errorf("expected selected = %q, got %q", "ls -la", model.selected)
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
 	}
-	if !model.quitting {
-		t.Error("expected quitting = true after Enter in stateSelect")
+	if model.selected != "" {
+		t.Errorf("selected = %q, want empty (cancelled)", model.selected)
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
 	}
 }
 
-func TestEnterKey_DoesNotInsertNewline(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
+func TestEscFromLoadingState(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateLoading
 
-	m := NewModel(cfg, "test query", false, "")
-
-	// Simulate pressing Enter - should NOT add a newline to textarea value
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
 
-	// The model should have transitioned to loading (not stayed in input with newline)
-	if model.state != stateLoading {
-		t.Errorf("expected stateLoading, got %d", model.state)
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
 	}
-
-	// The textarea should not contain any newlines from Enter key
-	if strings.Contains(model.textArea.Value(), "\n") {
-		t.Error("Enter key should not insert newline into textarea")
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
 	}
 }
 
-func TestEscKey_CancelsInAllStates(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
+func TestEscFromSelectState(t *testing.T) {
+	items := []string{"cmd1", "cmd2"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
 
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
+	}
+}
+
+func TestCommandsMsgSuccess(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+
+	cmds := []string{"ls -la", "find . -name '*.go'", "tree"}
+	updated, _ := m.Update(commandsMsg{commands: cmds})
+	model := updated.(Model)
+
+	if model.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d)", model.state, stateSelect)
+	}
+	if len(model.commands) != 3 {
+		t.Errorf("commands count = %d, want 3", len(model.commands))
+	}
+	if len(model.filtered) != 3 {
+		t.Errorf("filtered count = %d, want 3", len(model.filtered))
+	}
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0", model.cursor)
+	}
+}
+
+func TestCommandsMsgError(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+	m.state = stateLoading
+
+	updated, _ := m.Update(commandsMsg{err: errTest})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
+	}
+	if model.err == nil {
+		t.Error("err = nil, want error")
+	}
+}
+
+func TestMaxHeightCalculation(t *testing.T) {
 	tests := []struct {
-		name  string
-		state state
+		name       string
+		termHeight int
+		want       int
 	}{
-		{"stateInput", stateInput},
-		{"stateLoading", stateLoading},
-		{"stateSelect", stateSelect},
+		{"large terminal", 100, 40},
+		{"medium terminal", 30, 12},
+		{"small terminal uses minHeight", 10, minHeight},
+		{"tiny terminal uses minHeight", 5, minHeight},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewModel(cfg, "test", false, "")
-			m.state = tt.state
-
-			updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m := newModel(RunOptions{Theme: DefaultTheme()})
+			updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: tt.termHeight})
 			model := updated.(Model)
 
-			if !model.quitting {
-				t.Errorf("expected quitting = true after Esc in %s", tt.name)
+			if model.maxHeight != tt.want {
+				t.Errorf("maxHeight = %d, want %d", model.maxHeight, tt.want)
 			}
 		})
 	}
 }
 
-func TestView_ContainsTextAreaContent(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "list files", false, "")
-	// Set width so textarea renders properly
-	m.width = 80
-	m.textArea.SetWidth(78)
-
-	view := m.View()
-
-	// View should contain the textarea value
-	if !strings.Contains(view, "list files") {
-		t.Errorf("expected View to contain textarea value 'list files', got:\n%s", view)
-	}
-}
-
-func TestView_StateSelect_ShowsCommands(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-	m.commands = []string{"ls -la", "ls -lah", "ls -l"}
-	m.filtered = m.commands
-	m.state = stateSelect
-	m.cursor = 0
-	m.width = 80
-	m.maxHeight = 10
-	m.textArea.SetWidth(78)
-
-	view := m.View()
-
-	// View should contain the commands
-	if !strings.Contains(view, "ls -la") {
-		t.Errorf("expected View to contain 'ls -la', got:\n%s", view)
-	}
-	if !strings.Contains(view, "ls -lah") {
-		t.Errorf("expected View to contain 'ls -lah', got:\n%s", view)
-	}
-	// View should contain the counter
-	if !strings.Contains(view, "3/3") {
-		t.Errorf("expected View to contain counter '3/3', got:\n%s", view)
-	}
-}
-
-func TestView_StateLoading_ShowsSpinner(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "test", false, "")
-	m.state = stateLoading
-	m.width = 80
-	m.textArea.SetWidth(78)
-
-	view := m.View()
-
-	if !strings.Contains(view, "Generating commands...") {
-		t.Errorf("expected View to contain 'Generating commands...', got:\n%s", view)
-	}
-}
-
-func TestView_Quitting_ReturnsEmpty(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-	m.quitting = true
-	m.selected = ""
-
-	view := m.View()
-
-	if view != "" {
-		t.Errorf("expected empty View when quitting with no selection, got:\n%s", view)
-	}
-}
-
-func TestView_StateInput_ShowsError(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-	m.state = stateInput
-	m.err = fmt.Errorf("test error")
-	m.width = 80
-	m.textArea.SetWidth(78)
-
-	view := m.View()
-
-	if !strings.Contains(view, "test error") {
-		t.Errorf("expected View to contain error message, got:\n%s", view)
-	}
-}
-
-func TestResult_ReturnsCorrectQueryFromTextArea(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-	m.textArea.SetValue("find large files")
-
-	result := m.Result()
-	cancelled, ok := result.(CancelledResult)
-	if !ok {
-		t.Fatal("expected CancelledResult when in stateInput with no selection")
-	}
-	if cancelled.Query != "find large files" {
-		t.Errorf("expected Query = %q, got %q", "find large files", cancelled.Query)
-	}
-}
-
-func TestResult_SelectedResultFromSelection(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-	m.selected = "docker ps -a"
-
-	result := m.Result()
-	selected, ok := result.(SelectedResult)
-	if !ok {
-		t.Fatal("expected SelectedResult when command is selected")
-	}
-	if selected.Command != "docker ps -a" {
-		t.Errorf("expected Command = %q, got %q", "docker ps -a", selected.Command)
-	}
-}
-
-func TestResult_OriginalQueryInSelectState(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-	m.state = stateSelect
-	m.originalQuery = "list containers"
-	m.textArea.SetValue("filter text")
-
-	result := m.Result()
-	cancelled, ok := result.(CancelledResult)
-	if !ok {
-		t.Fatal("expected CancelledResult in select state with no selection")
-	}
-	// Should return original query, not the filter text
-	if cancelled.Query != "list containers" {
-		t.Errorf("expected Query = %q, got %q", "list containers", cancelled.Query)
-	}
-}
-
-func TestSelectedResult_ContainsOriginalQuery(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "list files", false, "")
-
-	// Simulate submitting the query (Enter in stateInput)
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = updated.(Model)
-
-	// Simulate receiving commands from LLM
-	updated, _ = m.Update(commandsMsg{commands: []string{"ls -la", "ls -lah"}})
-	m = updated.(Model)
-
-	// Simulate selecting a command (Enter in stateSelect)
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model := updated.(Model)
-
-	result := model.Result()
-	selected, ok := result.(SelectedResult)
-	if !ok {
-		t.Fatal("expected SelectedResult")
-	}
-	if selected.Command != "ls -la" {
-		t.Errorf("expected Command = %q, got %q", "ls -la", selected.Command)
-	}
-	if selected.Query != "list files" {
-		t.Errorf("expected Query = %q, got %q", "list files", selected.Query)
-	}
-}
-
-func TestSelectedResult_QueryFromDirectSelection(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-
-	// Set up model state as if query was submitted and commands received
-	m.originalQuery = "find large files"
-	m.commands = []string{"find . -size +1G", "du -sh *"}
-	m.filtered = m.commands
-	m.state = stateSelect
-	m.cursor = 0
-
-	// Select the first command
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	model := updated.(Model)
-
-	result := model.Result()
-	selected, ok := result.(SelectedResult)
-	if !ok {
-		t.Fatal("expected SelectedResult")
-	}
-	if selected.Query != "find large files" {
-		t.Errorf("expected Query = %q, got %q", "find large files", selected.Query)
-	}
-}
-
-func TestSelectedResult_QueryEmptyWhenNoQuerySubmitted(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-
-	m := NewModel(cfg, "", false, "")
-
-	// Directly set selected without going through query submission
-	m.selected = "ls -la"
-
-	result := m.Result()
-	selected, ok := result.(SelectedResult)
-	if !ok {
-		t.Fatal("expected SelectedResult")
-	}
-	if selected.Query != "" {
-		t.Errorf("expected Query = %q, got %q", "", selected.Query)
-	}
-}
-
-func TestHandleEnter_PipeContextNoSecret(t *testing.T) {
-	cfg := llm.Config{
-		BaseURL: "http://localhost",
-		APIKey:  "test",
-		Model:   "test",
-		Count:   3,
-	}
-	safePipeCtx := "total 48\n-rw-r--r-- 1 user staff 1024 Jan 1 file.txt"
-
-	m := NewModel(cfg, "delete large files", false, safePipeCtx)
+func TestEnterWithNonEmptyQuery(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("list files")
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 
-	if model.err != nil {
-		t.Errorf("expected no error, got %v", model.err)
-	}
 	if model.state != stateLoading {
-		t.Errorf("expected state = stateLoading, got %d", model.state)
+		t.Errorf("state = %d, want stateLoading (%d)", model.state, stateLoading)
+	}
+	if model.originalQuery != "list files" {
+		t.Errorf("originalQuery = %q, want %q", model.originalQuery, "list files")
 	}
 	if cmd == nil {
-		t.Error("expected non-nil command for generating")
+		t.Error("cmd = nil, want batch of spinner.Tick + generateCommands")
 	}
 }
+
+func TestEnterWithPrefilledQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "list files",
+		Theme:        DefaultTheme(),
+	})
+
+	if m.state != stateInput {
+		t.Fatalf("precondition: state = %d, want stateInput", m.state)
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d)", model.state, stateLoading)
+	}
+	if model.originalQuery != "list files" {
+		t.Errorf("originalQuery = %q, want %q", model.originalQuery, "list files")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want batch of spinner.Tick + generateCommands")
+	}
+}
+
+func TestEnterWithEmptyQuery(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil for empty query")
+	}
+}
+
+func TestEnterWithWhitespaceOnlyQuery(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("   ")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil for whitespace-only query")
+	}
+}
+
+func TestEnterWithSecretDetected(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("use api_key=abcdefghijklmnopqrstuvwxyz1234")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d) when secret detected", model.state, stateInput)
+	}
+	if model.err == nil {
+		t.Error("err = nil, want guard error for detected secret")
+	}
+}
+
+func TestEnterWithSecretDetectedForceSend(t *testing.T) {
+	m := newModel(RunOptions{
+		Theme:     DefaultTheme(),
+		ForceSend: true,
+	})
+	m.textArea.SetValue("use api_key=abcdefghijklmnopqrstuvwxyz1234")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d) with forceSend", model.state, stateLoading)
+	}
+	if model.err != nil {
+		t.Errorf("err = %v, want nil with forceSend", model.err)
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want batch command for loading")
+	}
+}
+
+func TestEnterClearsError(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.err = errTest
+	m.textArea.SetValue("list files")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.err != nil {
+		t.Errorf("err = %v, want nil after successful submit", model.err)
+	}
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d)", model.state, stateLoading)
+	}
+}
+
+func TestInputViewShowsTextarea(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("test query")
+
+	view := m.View()
+
+	if view == "" {
+		t.Error("View() returned empty string, want textarea content")
+	}
+	if !strings.Contains(view, "test query") {
+		t.Errorf("View() does not contain query text")
+	}
+}
+
+func TestInputViewShowsError(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.err = errTest
+
+	view := m.View()
+
+	if !strings.Contains(view, "test error") {
+		t.Errorf("View() does not contain error message")
+	}
+}
+
+func TestInputViewHidesErrorWhenNil(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	view := m.View()
+
+	if strings.Contains(view, "Error:") {
+		t.Errorf("View() should not contain Error: when err is nil")
+	}
+}
+
+func TestEnterDuringLoadingIgnored(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateLoading
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateLoading {
+		t.Errorf("state = %d, want stateLoading (%d) — Enter should be ignored", model.state, stateLoading)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil when Enter is ignored during loading")
+	}
+}
+
+func TestLoadingViewShowsSpinnerText(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateLoading
+
+	view := m.View()
+
+	if !strings.Contains(view, "Generating commands...") {
+		t.Errorf("loading View() should contain 'Generating commands...', got %q", view)
+	}
+}
+
+func TestLoadingViewNotEmpty(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateLoading
+
+	view := m.View()
+
+	if view == "" {
+		t.Error("loading View() should not be empty")
+	}
+}
+
+func TestCommandsMsgSuccessResetsScrollOffset(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+	m.scrollOffset = 5
+
+	cmds := []string{"cmd1", "cmd2"}
+	updated, _ := m.Update(commandsMsg{commands: cmds})
+	model := updated.(Model)
+
+	if model.scrollOffset != 0 {
+		t.Errorf("scrollOffset = %d, want 0 after commandsMsg", model.scrollOffset)
+	}
+}
+
+func TestCommandsMsgClearsTextarea(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "list files",
+		Theme:        DefaultTheme(),
+	})
+
+	cmds := []string{"ls -la", "find . -type f"}
+	updated, _ := m.Update(commandsMsg{commands: cmds})
+	model := updated.(Model)
+
+	if model.textArea.Value() != "" {
+		t.Errorf("textArea value = %q, want empty (should be cleared for filtering)", model.textArea.Value())
+	}
+	if model.prevFilter != "" {
+		t.Errorf("prevFilter = %q, want empty", model.prevFilter)
+	}
+}
+
+func TestCommandsMsgErrorPreservesQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "my query",
+		Theme:        DefaultTheme(),
+	})
+
+	// Press Enter to set originalQuery and transition to stateLoading
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	// Simulate error from LLM
+	updated, _ = model.Update(commandsMsg{err: errTest})
+	model = updated.(Model)
+
+	if model.originalQuery != "my query" {
+		t.Errorf("originalQuery = %q, want %q after error", model.originalQuery, "my query")
+	}
+}
+
+// --- Selector state tests (Task 7) ---
+
+func newSelectModel(commands []string) Model {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+	updated, _ := m.Update(commandsMsg{commands: commands})
+	return updated.(Model)
+}
+
+func TestSelectorNavigationDown(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model := updated.(Model)
+
+	if model.cursor != 1 {
+		t.Errorf("cursor = %d, want 1 after Down", model.cursor)
+	}
+}
+
+func TestSelectorNavigationUp(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.cursor = 2
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model := updated.(Model)
+
+	if model.cursor != 1 {
+		t.Errorf("cursor = %d, want 1 after Up", model.cursor)
+	}
+}
+
+func TestSelectorNavigationUpAtTop(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model := updated.(Model)
+
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 (should stay at top)", model.cursor)
+	}
+}
+
+func TestSelectorNavigationDownAtBottom(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.cursor = 2
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model := updated.(Model)
+
+	if model.cursor != 2 {
+		t.Errorf("cursor = %d, want 2 (should stay at bottom)", model.cursor)
+	}
+}
+
+func TestSelectorNavigationMultipleDown(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	for i := 0; i < 5; i++ {
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = result.(Model)
+	}
+
+	if m.cursor != 2 {
+		t.Errorf("cursor = %d, want 2 (clamped to last item)", m.cursor)
+	}
+}
+
+func TestSelectorFilter(t *testing.T) {
+	m := newSelectModel([]string{"ls -la", "find . -name '*.go'", "grep error log.txt"})
+
+	m.textArea.SetValue("find")
+	// Trigger filter by simulating a text change
+	m.prevFilter = ""
+	m.applyFilter()
+
+	if len(m.filtered) != 1 {
+		t.Errorf("filtered count = %d, want 1 for filter 'find'", len(m.filtered))
+	}
+	if m.filtered[0] != "find . -name '*.go'" {
+		t.Errorf("filtered[0] = %q, want %q", m.filtered[0], "find . -name '*.go'")
+	}
+}
+
+func TestSelectorFilterCaseInsensitive(t *testing.T) {
+	m := newSelectModel([]string{"LS -LA", "find files", "GREP pattern"})
+
+	m.textArea.SetValue("grep")
+	m.applyFilter()
+
+	if len(m.filtered) != 1 {
+		t.Errorf("filtered count = %d, want 1 for case-insensitive filter 'grep'", len(m.filtered))
+	}
+	if m.filtered[0] != "GREP pattern" {
+		t.Errorf("filtered[0] = %q, want %q", m.filtered[0], "GREP pattern")
+	}
+}
+
+func TestSelectorFilterResetsCursor(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.cursor = 2
+
+	m.textArea.SetValue("cmd")
+	m.applyFilter()
+
+	if m.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 after filter change", m.cursor)
+	}
+}
+
+func TestSelectorFilterEmptyShowsAll(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	m.textArea.SetValue("")
+	m.applyFilter()
+
+	if len(m.filtered) != 3 {
+		t.Errorf("filtered count = %d, want 3 for empty filter", len(m.filtered))
+	}
+}
+
+func TestSelectorFilterNoMatch(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	m.textArea.SetValue("zzz")
+	m.applyFilter()
+
+	if len(m.filtered) != 0 {
+		t.Errorf("filtered count = %d, want 0 for non-matching filter", len(m.filtered))
+	}
+}
+
+func TestSelectorEnterSelectsCommand(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.cursor = 1
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
+	}
+	if model.selected != "cmd2" {
+		t.Errorf("selected = %q, want %q", model.selected, "cmd2")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
+	}
+}
+
+func TestSelectorEnterWithEmptyFilteredList(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+	m.filtered = nil
+	m.filteredIdx = nil
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (should stay when nothing to select)", model.state)
+	}
+	if model.selected != "" {
+		t.Errorf("selected = %q, want empty", model.selected)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil when nothing to select")
+	}
+}
+
+func TestSelectorEnterAfterFilter(t *testing.T) {
+	m := newSelectModel([]string{"ls -la", "find . -name '*.go'", "grep error log.txt"})
+
+	m.textArea.SetValue("grep")
+	m.applyFilter()
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
+	}
+	if model.selected != "grep error log.txt" {
+		t.Errorf("selected = %q, want %q", model.selected, "grep error log.txt")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
+	}
+}
+
+func TestAutoSelectSingleCommand(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+
+	updated, cmd := m.Update(commandsMsg{commands: []string{"only-cmd"}})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d) for auto-select", model.state, stateDone)
+	}
+	if model.selected != "only-cmd" {
+		t.Errorf("selected = %q, want %q", model.selected, "only-cmd")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit for auto-select")
+	}
+}
+
+func TestAutoSelectDoesNotTriggerForMultipleCommands(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "test",
+		Theme:        DefaultTheme(),
+	})
+
+	updated, cmd := m.Update(commandsMsg{commands: []string{"cmd1", "cmd2"}})
+	model := updated.(Model)
+
+	if model.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d)", model.state, stateSelect)
+	}
+	if model.selected != "" {
+		t.Errorf("selected = %q, want empty", model.selected)
+	}
+	if cmd != nil {
+		t.Error("cmd should be nil (no auto-quit)")
+	}
+}
+
+func TestSelectorResultExtraction(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+	m.cursor = 1
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	result := model.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatalf("result type = %T, want SelectedResult", result)
+	}
+	if selected.Command != "cmd2" {
+		t.Errorf("Command = %q, want %q", selected.Command, "cmd2")
+	}
+}
+
+func TestSelectorCancelledResult(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	if _, ok := result.(CancelledResult); !ok {
+		t.Fatalf("result type = %T, want CancelledResult", result)
+	}
+}
+
+func TestSelectorModeEnterSetsIndex(t *testing.T) {
+	items := []string{"item-a", "item-b", "item-c"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
+	m.cursor = 2
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.selectedIndex != 2 {
+		t.Errorf("selectedIndex = %d, want 2", model.selectedIndex)
+	}
+	if model.selected != "item-c" {
+		t.Errorf("selected = %q, want %q", model.selected, "item-c")
+	}
+	if cmd == nil {
+		t.Error("cmd = nil, want tea.Quit")
+	}
+}
+
+func TestSelectorModeFilteredEnterSetsCorrectIndex(t *testing.T) {
+	items := []string{"apple", "banana", "cherry"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
+
+	m.textArea.SetValue("cherry")
+	m.applyFilter()
+
+	if len(m.filtered) != 1 {
+		t.Fatalf("filtered count = %d, want 1", len(m.filtered))
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.selectedIndex != 2 {
+		t.Errorf("selectedIndex = %d, want 2 (original index of cherry)", model.selectedIndex)
+	}
+}
+
+func TestSelectorViewContainsCommands(t *testing.T) {
+	m := newSelectModel([]string{"ls -la", "find .", "tree"})
+	m.width = 80
+	m.maxHeight = 10
+
+	view := m.View()
+
+	if !strings.Contains(view, "ls -la") {
+		t.Error("View() should contain first command")
+	}
+	if !strings.Contains(view, "find .") {
+		t.Error("View() should contain second command")
+	}
+	if !strings.Contains(view, "tree") {
+		t.Error("View() should contain third command")
+	}
+}
+
+func TestSelectorViewContainsPointer(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+	m.width = 80
+	m.maxHeight = 10
+
+	view := m.View()
+
+	if !strings.Contains(view, DefaultTheme().Pointer) {
+		t.Errorf("View() should contain pointer %q", DefaultTheme().Pointer)
+	}
+}
+
+func TestSelectorViewContainsCounter(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+	m.width = 80
+	m.maxHeight = 10
+
+	view := m.View()
+
+	if !strings.Contains(view, "3/3") {
+		t.Error("View() should contain counter '3/3'")
+	}
+}
+
+func TestSelectorViewFilteredCounter(t *testing.T) {
+	m := newSelectModel([]string{"ls -la", "find . -name '*.go'", "grep error"})
+	m.width = 80
+	m.maxHeight = 10
+	m.textArea.SetValue("find")
+	m.applyFilter()
+
+	view := m.View()
+
+	if !strings.Contains(view, "1/3") {
+		t.Error("View() should contain counter '1/3' after filtering")
+	}
+}
+
+func TestSelectorScrollOffset(t *testing.T) {
+	commands := make([]string, 20)
+	for i := range commands {
+		commands[i] = "cmd" + string(rune('a'+i))
+	}
+	m := newSelectModel(commands)
+	m.maxHeight = 6 // reservedLines=4, so visible=2
+
+	// Move cursor down past visible area
+	for i := 0; i < 5; i++ {
+		result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = result.(Model)
+	}
+
+	if m.cursor != 5 {
+		t.Errorf("cursor = %d, want 5", m.cursor)
+	}
+	if m.scrollOffset < 1 {
+		t.Errorf("scrollOffset = %d, should be > 0 when cursor exceeds visible area", m.scrollOffset)
+	}
+}
+
+func TestSelectorScrollOffsetUp(t *testing.T) {
+	commands := make([]string, 20)
+	for i := range commands {
+		commands[i] = "cmd" + string(rune('a'+i))
+	}
+	m := newSelectModel(commands)
+	m.maxHeight = 6 // visible = 2
+	m.cursor = 10
+	m.scrollOffset = 9
+
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = result.(Model)
+
+	if m.cursor != 9 {
+		t.Errorf("cursor = %d, want 9", m.cursor)
+	}
+	if m.scrollOffset != 9 {
+		t.Errorf("scrollOffset = %d, want 9", m.scrollOffset)
+	}
+}
+
+func TestVisibleItemCount(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.maxHeight = 10
+
+	got := m.visibleItemCount()
+	want := 10 - reservedLines
+	if got != want {
+		t.Errorf("visibleItemCount() = %d, want %d", got, want)
+	}
+}
+
+func TestVisibleItemCountMinimumOne(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.maxHeight = 3 // less than reservedLines
+
+	got := m.visibleItemCount()
+	if got < 1 {
+		t.Errorf("visibleItemCount() = %d, want at least 1", got)
+	}
+}
+
+func TestNavigationWithEmptyFilteredList(t *testing.T) {
+	m := newSelectModel([]string{"cmd1"})
+	m.filtered = nil
+	m.filteredIdx = nil
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model := updated.(Model)
+
+	if model.cursor != 0 {
+		t.Errorf("cursor = %d, want 0 with empty filtered list", model.cursor)
+	}
+}
+
+func TestSelectorFilterWithDisplayFn(t *testing.T) {
+	items := []string{"a", "b", "c"}
+	display := func(i int) string {
+		names := []string{"alpha-item", "beta-item", "charlie-item"}
+		return names[i]
+	}
+	m := newSelectorModel(items, display, DefaultTheme())
+
+	m.textArea.SetValue("beta")
+	m.applyFilter()
+
+	if len(m.filtered) != 1 {
+		t.Errorf("filtered count = %d, want 1 for filter 'beta'", len(m.filtered))
+	}
+	if m.filteredIdx[0] != 1 {
+		t.Errorf("filteredIdx[0] = %d, want 1 (original index of 'b')", m.filteredIdx[0])
+	}
+}
+
+func TestGetDisplayText(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2", "cmd3"})
+
+	got := m.getDisplayText(1)
+	if got != "cmd2" {
+		t.Errorf("getDisplayText(1) = %q, want %q", got, "cmd2")
+	}
+}
+
+func TestGetDisplayTextSelectorMode(t *testing.T) {
+	items := []string{"a", "b", "c"}
+	display := func(i int) string {
+		names := []string{"alpha", "beta", "charlie"}
+		return names[i]
+	}
+	m := newSelectorModel(items, display, DefaultTheme())
+
+	got := m.getDisplayText(1)
+	if got != "beta" {
+		t.Errorf("getDisplayText(1) = %q, want %q", got, "beta")
+	}
+}
+
+// --- Done state and result extraction tests (Task 8) ---
+
+func TestDoneStateViewReturnsEmpty(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.state = stateDone
+	m.quitting = true
+
+	view := m.View()
+
+	if view != "" {
+		t.Errorf("View() = %q, want empty string in done state", view)
+	}
+}
+
+func TestDoneStateViewAfterSelection(t *testing.T) {
+	m := newSelectModel([]string{"cmd1", "cmd2"})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	view := model.View()
+
+	if view != "" {
+		t.Errorf("View() = %q, want empty string after selection", view)
+	}
+}
+
+func TestDoneStateViewAfterCancel(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	view := model.View()
+
+	if view != "" {
+		t.Errorf("View() = %q, want empty string after cancel", view)
+	}
+}
+
+func TestResultSelectedFromInput(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "list files",
+		Theme:        DefaultTheme(),
+	})
+
+	// Press Enter to submit the pre-filled query (sets originalQuery)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	// Simulate receiving commands and selecting one
+	updated, _ = model.Update(commandsMsg{commands: []string{"ls -la", "find ."}})
+	model = updated.(Model)
+	model.cursor = 0
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+
+	result := model.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatalf("result type = %T, want SelectedResult", result)
+	}
+	if selected.Command != "ls -la" {
+		t.Errorf("Command = %q, want %q", selected.Command, "ls -la")
+	}
+	if selected.Query != "list files" {
+		t.Errorf("Query = %q, want %q", selected.Query, "list files")
+	}
+}
+
+func TestResultCancelledFromInput(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+	m.textArea.SetValue("test query")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatalf("result type = %T, want CancelledResult", result)
+	}
+	if cancelled.Query != "test query" {
+		t.Errorf("Query = %q, want %q (should fall back to textarea value)", cancelled.Query, "test query")
+	}
+}
+
+func TestResultCancelledFromInputWithInitialQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "find . -type f",
+		Theme:        DefaultTheme(),
+	})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	result := model.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatalf("result type = %T, want CancelledResult", result)
+	}
+	if cancelled.Query != "find . -type f" {
+		t.Errorf("Query = %q, want %q (should preserve pre-filled query for shell buffer restore)", cancelled.Query, "find . -type f")
+	}
+}
+
+func TestResultCancelledFromLoading(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "my query",
+		Theme:        DefaultTheme(),
+	})
+
+	// Press Enter to submit query (sets originalQuery, transitions to stateLoading)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	// Cancel during loading
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = updated.(Model)
+
+	result := model.Result()
+	cancelled, ok := result.(CancelledResult)
+	if !ok {
+		t.Fatalf("result type = %T, want CancelledResult", result)
+	}
+	if cancelled.Query != "my query" {
+		t.Errorf("Query = %q, want %q", cancelled.Query, "my query")
+	}
+}
+
+func TestResultAutoSelectSetsQuery(t *testing.T) {
+	m := newModel(RunOptions{
+		InitialQuery: "find go files",
+		Theme:        DefaultTheme(),
+	})
+
+	// Press Enter to submit query (sets originalQuery)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	// Simulate single command result (auto-select)
+	updated, _ = model.Update(commandsMsg{commands: []string{"find . -name '*.go'"}})
+	model = updated.(Model)
+
+	result := model.Result()
+	selected, ok := result.(SelectedResult)
+	if !ok {
+		t.Fatalf("result type = %T, want SelectedResult", result)
+	}
+	if selected.Command != "find . -name '*.go'" {
+		t.Errorf("Command = %q, want %q", selected.Command, "find . -name '*.go'")
+	}
+	if selected.Query != "find go files" {
+		t.Errorf("Query = %q, want %q", selected.Query, "find go files")
+	}
+}
+
+func TestRunSelectorResultIndex(t *testing.T) {
+	items := []string{"item-a", "item-b", "item-c"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
+	m.cursor = 1
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.selectedIndex != 1 {
+		t.Errorf("selectedIndex = %d, want 1", model.selectedIndex)
+	}
+}
+
+func TestRunSelectorCancelledIndex(t *testing.T) {
+	items := []string{"item-a", "item-b"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, DefaultTheme())
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	if model.selectedIndex != -1 {
+		t.Errorf("selectedIndex = %d, want -1 (cancelled)", model.selectedIndex)
+	}
+}
+
+func TestEmptyCommandList(t *testing.T) {
+	m := newModel(RunOptions{InitialQuery: "test query", Theme: DefaultTheme()})
+	m.state = stateLoading
+
+	updated, _ := m.Update(commandsMsg{commands: []string{}})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
+	}
+	if model.err == nil {
+		t.Error("err = nil, want 'no commands generated' error")
+	}
+}
+
+func TestEmptyCommandListNil(t *testing.T) {
+	m := newModel(RunOptions{InitialQuery: "test query", Theme: DefaultTheme()})
+	m.state = stateLoading
+
+	updated, _ := m.Update(commandsMsg{commands: nil})
+	model := updated.(Model)
+
+	if model.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", model.state, stateInput)
+	}
+	if model.err == nil {
+		t.Error("err = nil, want 'no commands generated' error")
+	}
+}
+
+func TestEmptyCommandListEnterDoesNothing(t *testing.T) {
+	m := newModel(RunOptions{InitialQuery: "test query", Theme: DefaultTheme()})
+	m.state = stateSelect
+	m.commands = []string{}
+	m.filtered = []string{}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model := updated.(Model)
+
+	if model.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d) — Enter should be no-op with no items", model.state, stateSelect)
+	}
+	if cmd != nil {
+		t.Errorf("cmd = %v, want nil", cmd)
+	}
+}
+
+func TestEmptyCommandListEscCancels(t *testing.T) {
+	m := newModel(RunOptions{InitialQuery: "test query", Theme: DefaultTheme()})
+	m.state = stateSelect
+	m.commands = []string{}
+	m.filtered = []string{}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model := updated.(Model)
+
+	if model.state != stateDone {
+		t.Errorf("state = %d, want stateDone (%d)", model.state, stateDone)
+	}
+	if model.selected != "" {
+		t.Errorf("selected = %q, want empty (cancelled)", model.selected)
+	}
+}
+
+func TestNewModelWithRendererAwareTheme(t *testing.T) {
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	theme := DefaultTheme().WithRenderer(r)
+	m := newModel(RunOptions{Theme: theme})
+
+	if m.state != stateInput {
+		t.Errorf("state = %d, want stateInput (%d)", m.state, stateInput)
+	}
+	if m.theme.renderer != r {
+		t.Error("model theme should preserve the renderer")
+	}
+}
+
+func TestNewSelectorModelWithRendererAwareTheme(t *testing.T) {
+	r := lipgloss.NewRenderer(&bytes.Buffer{})
+	theme := DefaultTheme().WithRenderer(r)
+	items := []string{"cmd1", "cmd2"}
+	m := newSelectorModel(items, func(i int) string { return items[i] }, theme)
+
+	if m.state != stateSelect {
+		t.Errorf("state = %d, want stateSelect (%d)", m.state, stateSelect)
+	}
+	if m.theme.renderer != r {
+		t.Error("selector model theme should preserve the renderer")
+	}
+}
+
+// --- Textarea height tests ---
+
+func TestTextareaFixedHeight(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	if m.textArea.Height() != 1 {
+		t.Errorf("Height() = %d, want 1", m.textArea.Height())
+	}
+	if m.textArea.MaxHeight != 1 {
+		t.Errorf("MaxHeight = %d, want 1", m.textArea.MaxHeight)
+	}
+}
+
+func TestTextareaStaysOneLineOnLongInput(t *testing.T) {
+	m := newModel(RunOptions{Theme: DefaultTheme()})
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 20, Height: 40})
+	m = updated.(Model)
+
+	m.textArea.SetValue("this is a long text that should scroll horizontally")
+	updated, _ = m.Update(nil)
+	m = updated.(Model)
+
+	if m.textArea.Height() != 1 {
+		t.Errorf("Height() = %d, want 1 — textarea should not auto-resize", m.textArea.Height())
+	}
+}
+
+var errTest = testError("test error")
+
+type testError string
+
+func (e testError) Error() string { return string(e) }

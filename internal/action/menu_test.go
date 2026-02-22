@@ -28,6 +28,24 @@ func TestShouldPrompt_WithPipe(t *testing.T) {
 	}
 }
 
+func TestShouldPromptStderr_WithPipe(t *testing.T) {
+	// When stderr is redirected to a pipe, ShouldPromptStderr should return false.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+	defer func() { _ = w.Close() }()
+
+	origStderr := os.Stderr
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	if ShouldPromptStderr() {
+		t.Error("ShouldPromptStderr() = true for pipe stderr, want false")
+	}
+}
+
 func TestReadKeypress_Execute(t *testing.T) {
 	for _, key := range []byte{'e', 'E'} {
 		r := bytes.NewReader([]byte{key})
@@ -233,6 +251,12 @@ func TestDispatchAction_Copy(t *testing.T) {
 		t.Skip("clipboard not available in this environment")
 	}
 
+	// Probe clipboard availability: some environments report supported
+	// but the clipboard binary (e.g. pbcopy) is not accessible.
+	if err := clipboard.WriteAll("probe"); err != nil {
+		t.Skipf("clipboard not functional: %v", err)
+	}
+
 	// Redirect stderr to capture "Copied to clipboard." message
 	origStderr := os.Stderr
 	stderrR, stderrW, err := os.Pipe()
@@ -293,6 +317,98 @@ func TestDispatchAction_Revise(t *testing.T) {
 	var reviseErr *ReviseRequestedError
 	if !errors.As(err, &reviseErr) {
 		t.Fatalf("expected ReviseRequestedError, got %T: %v", err, err)
+	}
+}
+
+func TestPromptActionWith_ShellIntegration_ClearsMenu(t *testing.T) {
+	orig := inShellIntegration
+	inShellIntegration = func() bool { return true }
+	t.Cleanup(func() { inShellIntegration = orig })
+
+	// Redirect stdout to pipe (quit action writes command to stdout)
+	stdoutR, stdoutW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdout pipe: %v", err)
+	}
+	origStdout := os.Stdout
+	os.Stdout = stdoutW
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	// Redirect stderr to pipe to capture menu output
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+	origStderr := os.Stderr
+	os.Stderr = stderrW
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	input := bytes.NewReader([]byte{'q'})
+	promptErr := promptActionWith("echo hello", input)
+	_ = stdoutW.Close()
+	_ = stderrW.Close()
+
+	if promptErr != nil {
+		t.Errorf("promptActionWith returned error: %v", promptErr)
+	}
+
+	stderrOut, _ := io.ReadAll(stderrR)
+	_ = stderrR.Close()
+	_ = stdoutR.Close()
+
+	stderrStr := string(stderrOut)
+	// Should contain ANSI clear sequence: \r\033[3A\033[J
+	if !bytes.Contains(stderrOut, []byte("\033[3A")) {
+		t.Errorf("stderr in shell integration mode should contain cursor-up sequence (\\033[3A), got %q", stderrStr)
+	}
+	if !bytes.Contains(stderrOut, []byte("\033[J")) {
+		t.Errorf("stderr in shell integration mode should contain clear-to-end sequence (\\033[J), got %q", stderrStr)
+	}
+}
+
+func TestPromptActionWith_NormalMode_NoANSIClear(t *testing.T) {
+	orig := inShellIntegration
+	inShellIntegration = func() bool { return false }
+	t.Cleanup(func() { inShellIntegration = orig })
+
+	// Redirect stdout to pipe (quit action writes command to stdout)
+	stdoutR, stdoutW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdout pipe: %v", err)
+	}
+	origStdout := os.Stdout
+	os.Stdout = stdoutW
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	// Redirect stderr to capture menu output
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+	origStderr := os.Stderr
+	os.Stderr = stderrW
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	input := bytes.NewReader([]byte{'q'})
+	promptErr := promptActionWith("echo hello", input)
+	_ = stdoutW.Close()
+	_ = stderrW.Close()
+
+	if promptErr != nil {
+		t.Errorf("promptActionWith returned error: %v", promptErr)
+	}
+
+	stderrOut, _ := io.ReadAll(stderrR)
+	_ = stderrR.Close()
+	_ = stdoutR.Close()
+
+	stderrStr := string(stderrOut)
+	// Should NOT contain ANSI clear sequences in normal mode
+	if bytes.Contains(stderrOut, []byte("\033[3A")) {
+		t.Errorf("stderr in normal mode should NOT contain cursor-up sequence (\\033[3A), got %q", stderrStr)
+	}
+	if bytes.Contains(stderrOut, []byte("\033[J")) {
+		t.Errorf("stderr in normal mode should NOT contain clear-to-end sequence (\\033[J), got %q", stderrStr)
 	}
 }
 
