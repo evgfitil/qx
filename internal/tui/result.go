@@ -1,4 +1,4 @@
-package ui
+package tui
 
 // Result represents the outcome of TUI interaction.
 type Result interface {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/evgfitil/qx/internal/ui"
+	"github.com/evgfitil/qx/internal/tui"
 )
 
 // resetViper clears all viper state between tests to avoid cross-contamination.
@@ -105,7 +105,7 @@ llm:
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	defaults := ui.DefaultTheme()
+	defaults := tui.DefaultTheme()
 	if cfg.Theme.Prompt != defaults.Prompt {
 		t.Errorf("Theme.Prompt = %q, want default %q", cfg.Theme.Prompt, defaults.Prompt)
 	}

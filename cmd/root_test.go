@@ -14,7 +14,7 @@ import (
 	"github.com/evgfitil/qx/internal/guard"
 	"github.com/evgfitil/qx/internal/history"
 	"github.com/evgfitil/qx/internal/llm"
-	"github.com/evgfitil/qx/internal/ui"
+	"github.com/evgfitil/qx/internal/tui"
 )
 
 func TestErrCancelled_CanBeExtracted(t *testing.T) {
@@ -981,8 +981,8 @@ func TestRunInteractive_WithMockedUI_SelectedResult(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("OPENAI_API_KEY", "test-key")
 
-	uiRunFn = func(opts ui.RunOptions) (ui.Result, error) {
-		return ui.SelectedResult{Command: "ls -la", Query: "list files"}, nil
+	uiRunFn = func(opts tui.RunOptions) (tui.Result, error) {
+		return tui.SelectedResult{Command: "ls -la", Query: "list files"}, nil
 	}
 
 	r, w, _ := os.Pipe()
@@ -1009,8 +1009,8 @@ func TestRunInteractive_WithMockedUI_CancelledResult(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("OPENAI_API_KEY", "test-key")
 
-	uiRunFn = func(opts ui.RunOptions) (ui.Result, error) {
-		return ui.CancelledResult{Query: "list files"}, nil
+	uiRunFn = func(opts tui.RunOptions) (tui.Result, error) {
+		return tui.CancelledResult{Query: "list files"}, nil
 	}
 
 	r, w, _ := os.Pipe()
@@ -1042,7 +1042,7 @@ func TestRunHistory_WithMockedSelector_SelectsEntry(t *testing.T) {
 		Timestamp: time.Now(),
 	})
 
-	uiRunSelectorFn = func(items []string, display func(int) string, theme ui.Theme) (int, error) {
+	uiRunSelectorFn = func(items []string, display func(int) string, theme tui.Theme) (int, error) {
 		return 0, nil
 	}
 
@@ -1075,7 +1075,7 @@ func TestRunHistory_WithMockedSelector_Cancelled(t *testing.T) {
 		Timestamp: time.Now(),
 	})
 
-	uiRunSelectorFn = func(items []string, display func(int) string, theme ui.Theme) (int, error) {
+	uiRunSelectorFn = func(items []string, display func(int) string, theme tui.Theme) (int, error) {
 		return -1, nil
 	}
 

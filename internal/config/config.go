@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/evgfitil/qx/internal/llm"
-	"github.com/evgfitil/qx/internal/ui"
+	"github.com/evgfitil/qx/internal/tui"
 )
 
 const (
@@ -40,9 +40,9 @@ type ThemeConfig struct {
 	BorderFg   string `mapstructure:"border_fg"`
 }
 
-// ToTheme converts ThemeConfig to ui.Theme.
-func (tc ThemeConfig) ToTheme() ui.Theme {
-	return ui.Theme{
+// ToTheme converts ThemeConfig to tui.Theme.
+func (tc ThemeConfig) ToTheme() tui.Theme {
+	return tui.Theme{
 		Prompt:     tc.Prompt,
 		Pointer:    tc.Pointer,
 		SelectedFg: tc.SelectedFg,
@@ -89,7 +89,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("llm.model", DefaultModel)
 	viper.SetDefault("llm.count", DefaultCount)
 
-	defaults := ui.DefaultTheme()
+	defaults := tui.DefaultTheme()
 	viper.SetDefault("theme.prompt", defaults.Prompt)
 	viper.SetDefault("theme.pointer", defaults.Pointer)
 	viper.SetDefault("theme.selected_fg", defaults.SelectedFg)

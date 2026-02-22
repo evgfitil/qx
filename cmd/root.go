@@ -16,7 +16,7 @@ import (
 	"github.com/evgfitil/qx/internal/history"
 	"github.com/evgfitil/qx/internal/llm"
 	"github.com/evgfitil/qx/internal/shell"
-	"github.com/evgfitil/qx/internal/ui"
+	"github.com/evgfitil/qx/internal/tui"
 )
 
 const ExitCodeCancelled = 130
@@ -42,8 +42,8 @@ var (
 	promptActionFn       = action.PromptAction
 	readRefinementFn     = action.ReadRefinement
 	generateCommandsFn   func(query string, pipeContext string, followUp *llm.FollowUpContext) error
-	uiRunFn              = ui.Run
-	uiRunSelectorFn      = ui.RunSelector
+	uiRunFn              = tui.Run
+	uiRunSelectorFn      = tui.RunSelector
 )
 
 var rootCmd = &cobra.Command{
@@ -139,7 +139,7 @@ func runInteractive(initialQuery string, pipeContext string) error {
 		return ErrCancelled
 	}
 
-	result, err := uiRunFn(ui.RunOptions{
+	result, err := uiRunFn(tui.RunOptions{
 		InitialQuery: initialQuery,
 		LLMConfig:    cfg.LLM.ToLLMConfig(),
 		ForceSend:    forceSend,
@@ -151,12 +151,12 @@ func runInteractive(initialQuery string, pipeContext string) error {
 	}
 
 	switch r := result.(type) {
-	case ui.CancelledResult:
+	case tui.CancelledResult:
 		if r.Query != "" {
 			fmt.Println(r.Query)
 		}
 		return ErrCancelled
-	case ui.SelectedResult:
+	case tui.SelectedResult:
 		if r.Command != "" {
 			return handleSelectedCommand(r.Command, r.Query, pipeContext, cfg.ActionMenu)
 		}
@@ -222,7 +222,7 @@ func runHistory() error {
 		items[i] = formatHistoryEntry(entries[i])
 	}
 
-	theme := ui.DefaultTheme()
+	theme := tui.DefaultTheme()
 	if cfg, loadErr := config.Load(); loadErr == nil {
 		theme = cfg.Theme.ToTheme()
 	}
