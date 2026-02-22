@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-02-22
+
 ### Added
 
 - fzf-style inline TUI replacing the old alternate-screen interface
@@ -138,7 +140,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shell integration (bash, zsh)
 - Goreleaser and release workflow
 
-[Unreleased]: https://github.com/evgfitil/qx/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/evgfitil/qx/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/evgfitil/qx/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/evgfitil/qx/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/evgfitil/qx/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/evgfitil/qx/compare/v0.7.0...v0.7.1
