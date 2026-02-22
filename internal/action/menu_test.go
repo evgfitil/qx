@@ -251,6 +251,12 @@ func TestDispatchAction_Copy(t *testing.T) {
 		t.Skip("clipboard not available in this environment")
 	}
 
+	// Probe clipboard availability: some environments report supported
+	// but the clipboard binary (e.g. pbcopy) is not accessible.
+	if err := clipboard.WriteAll("probe"); err != nil {
+		t.Skipf("clipboard not functional: %v", err)
+	}
+
 	// Redirect stderr to capture "Copied to clipboard." message
 	origStderr := os.Stderr
 	stderrR, stderrW, err := os.Pipe()

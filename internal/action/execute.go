@@ -36,12 +36,7 @@ func Execute(command string) error {
 	shell := detectShell()
 	cmd := exec.Command(shell, "-c", command)
 
-	stdoutIsPipe := !isatty.IsTerminal(os.Stdout.Fd()) &&
-		!isatty.IsCygwinTerminal(os.Stdout.Fd())
-	stderrIsTTY := isatty.IsTerminal(os.Stderr.Fd()) ||
-		isatty.IsCygwinTerminal(os.Stderr.Fd())
-
-	if stdoutIsPipe && stderrIsTTY {
+	if inShellIntegration() {
 		ttyOut, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
 		if err == nil {
 			defer func() { _ = ttyOut.Close() }()

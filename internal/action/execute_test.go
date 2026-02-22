@@ -90,7 +90,7 @@ func TestExecute_ExitCode2(t *testing.T) {
 func TestExecute_EchoCommand(t *testing.T) {
 	t.Setenv("SHELL", "/bin/sh")
 
-	// Redirect stdout to capture output
+	// Redirect stdout to capture output.
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("failed to create pipe: %v", err)
@@ -100,8 +100,21 @@ func TestExecute_EchoCommand(t *testing.T) {
 	os.Stdout = w
 	t.Cleanup(func() { os.Stdout = oldStdout })
 
+	// Redirect stderr to pipe to prevent shell integration detection
+	// (stdout=pipe + stderr=TTY would route output to /dev/tty).
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+	defer func() { _ = stderrR.Close() }()
+
+	origStderr := os.Stderr
+	os.Stderr = stderrW
+	t.Cleanup(func() { os.Stderr = origStderr })
+
 	execErr := Execute("echo hello")
 	_ = w.Close()
+	_ = stderrW.Close()
 
 	if execErr != nil {
 		t.Fatalf("Execute(\"echo hello\") returned error: %v", execErr)
@@ -158,6 +171,50 @@ func TestExecute_ShellIntegration_NoOutputOnStdoutPipe(t *testing.T) {
 	_ = r.Close()
 	if len(out) != 0 {
 		t.Errorf("expected no output on stdout pipe in shell integration mode, got %q", string(out))
+	}
+}
+
+func TestExecute_ShellIntegration_FailingCommand(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+
+	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+	if err != nil {
+		t.Skip("skipping: /dev/tty not available")
+	}
+	defer func() { _ = tty.Close() }()
+
+	origStderr := os.Stderr
+	os.Stderr = tty
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+
+	origStdout := os.Stdout
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	execErr := Execute("echo fail >&2; exit 1")
+	_ = w.Close()
+
+	if execErr == nil {
+		t.Fatal("expected error from failing command, got nil")
+	}
+
+	var exitErr *ExitError
+	if !errors.As(execErr, &exitErr) {
+		t.Fatalf("expected ExitError, got %T: %v", execErr, execErr)
+	}
+	if exitErr.Code != 1 {
+		t.Errorf("expected exit code 1, got %d", exitErr.Code)
+	}
+
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+	if len(out) != 0 {
+		t.Errorf("expected no output on stdout pipe for failing command in shell integration mode, got %q", string(out))
 	}
 }
 
