@@ -10,14 +10,14 @@ Generate shell commands from natural language using LLM.
 
 ## Features
 
-- Natural language to shell command conversion
-- Multiple command variants with fuzzy selection
-- Interactive TUI with real-time filtering
-- Optional post-selection action menu: execute, copy to clipboard, or revise with follow-up
-- Pipe command output as context for precise command generation
-- Shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support
-- Command history with `--last`, `--history`, and `--continue` for follow-up refinement
-- Support for OpenAI-compatible APIs
+- natural language to shell command conversion;
+- multiple command variants with fuzzy selection;
+- interactive TUI with real-time filtering;
+- optional post-selection action menu: execute, copy to clipboard, or revise with follow-up;
+- pipe command output as context for precise command generation;
+- shell integration (Ctrl+G hotkey) for Bash, Zsh, and Fish with inline editing support;
+- command history with `--last`, `--history`, and `--continue` for follow-up refinement;
+- support for OpenAI-compatible APIs.
 
 ## Installation
 
@@ -57,7 +57,7 @@ Environment variable takes precedence if both are set.
 
 ### Theme
 
-Customize the TUI appearance with an optional `theme` section (all fields have fzf-like defaults):
+Customize the TUI appearance with an optional `theme` section (all fields have sensible defaults):
 
 ```yaml
 theme:
@@ -113,10 +113,6 @@ input as initial query. Add instructions to modify or extend the command.
 **Prompt restoration**: Press Esc to cancel selection and restore your query
 to the command line for editing.
 
-**Error display**: If qx encounters an error (invalid configuration, API failure, etc.),
-the error message is displayed in the terminal. Normal cancellation via Esc does not
-produce error output.
-
 ### Direct mode
 
 ```bash
@@ -142,9 +138,9 @@ qx --query "git log"
 Pipe command output into qx to provide context for more precise generation:
 
 ```bash
-ls -la | qx "delete files larger than 1GB"
 docker ps | qx "stop all nginx containers"
-git branch | qx "delete all merged branches"
+kubectl get pods | qx "restart pods in CrashLoopBackOff"
+git log --oneline -20 | qx "revert the commit that added auth"
 ```
 
 Pipe mode also works with interactive TUI:
