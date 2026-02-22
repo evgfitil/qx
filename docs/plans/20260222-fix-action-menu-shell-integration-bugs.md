@@ -102,12 +102,12 @@ Bug 2 fix — clear menu after action chosen:
 
 ### Task 2: Clear action menu after action chosen in shell integration mode
 
-- [ ] add `inShellIntegration()` helper in `menu.go`: returns true when stdout is NOT TTY and stderr IS TTY
-- [ ] in `promptActionWith()`, after `readAction()` returns: if `inShellIntegration()`, emit ANSI sequences to stderr to erase menu lines (move cursor up + clear line for each of the 4 printed lines: empty, command, empty, menu)
-- [ ] keep current behavior (newlines for spacing) when NOT in shell integration mode
-- [ ] write test: `promptActionWith()` with stdout=pipe, stderr=pipe → stderr output includes ANSI clear sequences (`\033[A`, `\033[2K`)
-- [ ] write test: `promptActionWith()` with stdout=TTY → stderr output does NOT include ANSI clear sequences (no regression)
-- [ ] run tests (`go test ./internal/action/...`) — must pass
+- [x] add `inShellIntegration()` helper in `menu.go`: returns true when stdout is NOT TTY and stderr IS TTY
+- [x] in `promptActionWith()`, after `readAction()` returns: if `inShellIntegration()`, emit ANSI sequences to stderr to erase menu lines (move cursor up + clear line for each of the 4 printed lines: empty, command, empty, menu)
+- [x] keep current behavior (newlines for spacing) when NOT in shell integration mode
+- [x] write test: `promptActionWith()` with stdout=pipe, stderr=pipe → stderr output includes ANSI clear sequences (`\033[A`, `\033[2K`)
+- [x] write test: `promptActionWith()` with stdout=TTY → stderr output does NOT include ANSI clear sequences (no regression)
+- [x] run tests (`go test ./internal/action/...`) — must pass
 
 ### Task 3: Verify acceptance criteria
 
