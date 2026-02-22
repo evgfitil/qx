@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 
 	"github.com/evgfitil/qx/internal/llm"
 )
@@ -17,6 +18,26 @@ type RunOptions struct {
 	ForceSend    bool
 	PipeContext  string
 	Theme        Theme
+}
+
+// saveTermState saves the current terminal state from /dev/tty and returns
+// a function that restores it. This guards against bubbletea leaving the
+// terminal in raw mode (echo disabled) after exit, which breaks subsequent
+// line-oriented input such as the revise prompt.
+func saveTermState() func() {
+	f, err := os.Open("/dev/tty")
+	if err != nil {
+		return func() {}
+	}
+	state, err := term.GetState(int(f.Fd()))
+	if err != nil {
+		_ = f.Close()
+		return func() {}
+	}
+	return func() {
+		_ = term.Restore(int(f.Fd()), state)
+		_ = f.Close()
+	}
 }
 
 // openTTY opens /dev/tty for writing and creates a lipgloss renderer from it.
@@ -39,10 +60,12 @@ func Run(opts RunOptions) (Result, error) {
 	}
 	opts.Theme = theme
 
+	restore := saveTermState()
 	m := newModel(opts)
 	p := tea.NewProgram(m, tea.WithOutput(tty), tea.WithInputTTY())
 
 	result, err := p.Run()
+	restore()
 	if err != nil {
 		return nil, fmt.Errorf("TUI error: %w", err)
 	}
@@ -62,10 +85,12 @@ func RunSelector(items []string, display func(int) string, theme Theme) (int, er
 		defer tty.Close() //nolint:errcheck
 	}
 
+	restore := saveTermState()
 	m := newSelectorModel(items, display, theme)
 	p := tea.NewProgram(m, tea.WithOutput(tty), tea.WithInputTTY())
 
 	result, err := p.Run()
+	restore()
 	if err != nil {
 		return -1, fmt.Errorf("selector error: %w", err)
 	}
